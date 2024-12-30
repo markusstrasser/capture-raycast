@@ -9,9 +9,15 @@
   "commands": [
     {
       "name": "capture",
-      "title": "capture",
-      "description": "",
+      "title": "Capture Context",
+      "description": "Capture current context with preview",
       "mode": "view"
+    },
+    {
+      "name": "quick-capture",
+      "title": "Quick Capture Context",
+      "description": "Silently capture current context",
+      "mode": "no-view"
     }
   ],
   "dependencies": {

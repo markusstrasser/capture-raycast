@@ -1,138 +1,153 @@
-import {
-  Form,
-  showToast,
-  Toast,
-  BrowserExtension,
-  Clipboard,
-  ActionPanel,
-  Action,
-  getFrontmostApplication,
-  getSelectedText,
-} from "@raycast/api";
-import { runAppleScript } from "@raycast/utils";
-import * as fs from "node:fs/promises";
+import { showToast, Toast, ActionPanel, Action, List } from "@raycast/api";
+import { captureContext, CapturedData, FileService, CONFIG } from "./utils";
 import * as path from "node:path";
-import * as os from "node:os";
+import { useState, useLayoutEffect } from "react";
 
-// Configuration
-const CONFIG = {
-  saveDir: path.join(os.homedir(), "Downloads", "raycast-captures"),
-  browserApps: ["Arc", "Brave", "Chrome", "Safari", "Firefox"] as const,
-} as const;
+// Preview Component
+function PreviewMetadata({ data }: { data: CapturedData }) {
+  const markdown = `
+# Captured Context
 
-type BrowserApp = (typeof CONFIG.browserApps)[number];
+${data.clipboardText ? `**Clipboard Content:**\n${data.clipboardText}\n` : ""}
+${data.activeAppName ? `**Active App:** ${data.activeAppName}\n` : ""}
+${data.activeURL ? `**Active URL:** ${data.activeURL}\n` : ""}
+**Timestamp:** ${new Date(data.timestamp).toLocaleString()}
+${data.screenshotPath ? `\n![Screenshot](${data.screenshotPath})\n` : ""}
+${data.browserTabHTML ? `\n**Browser Tab HTML Preview:**\n\`\`\`html\n${data.browserTabHTML.slice(0, 500)}...\n\`\`\`\n` : ""}
+`;
 
-// Types
-interface CapturedData {
-  selectedText: string | null;
-  activeAppBundleId: string | null;
-  activeAppName: string | null;
-  activeURL: string | null;
-  timestamp: string;
-  frontAppName: string | null;
+  return (
+    <List.Item.Detail
+      markdown={markdown}
+      metadata={
+        <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.Label title="Application" text={data.activeAppName || "None"} />
+          {data.activeURL && (
+            <>
+              <List.Item.Detail.Metadata.Separator />
+              <List.Item.Detail.Metadata.Link title="URL" target={data.activeURL} text={data.activeURL} />
+            </>
+          )}
+          {data.screenshotPath && (
+            <>
+              <List.Item.Detail.Metadata.Separator />
+              <List.Item.Detail.Metadata.Label title="Screenshot" text="✓ Captured" />
+            </>
+          )}
+          {data.browserTabHTML && (
+            <>
+              <List.Item.Detail.Metadata.Separator />
+              <List.Item.Detail.Metadata.Label title="HTML Content" text="✓ Captured" />
+            </>
+          )}
+          <List.Item.Detail.Metadata.Separator />
+          <List.Item.Detail.Metadata.Label title="Bundle ID" text={data.activeAppBundleId || "None"} />
+        </List.Item.Detail.Metadata>
+      }
+    />
+  );
 }
-
-// Services
-const FileService = {
-  async ensureDirectory(dir: string) {
-    await fs.mkdir(dir, { recursive: true });
-  },
-
-  async saveJSON(filePath: string, data: unknown) {
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2));
-  },
-
-  getTimestampedPath(base: string, name: string, ext: string) {
-    const timestamp = new Date().toISOString().replace(/:/g, "-");
-    return path.join(base, `${name}-${timestamp}.${ext}`);
-  },
-};
-
-const WindowService = {
-  async getActiveAppInfo() {
-    const script = `
-      tell application "System Events"
-        set frontAppProcess to first application process whose frontmost is true
-        set frontAppName to name of frontAppProcess
-        set bundleID to id of frontAppProcess
-        return frontAppName & "|||" & bundleID
-      end tell
-    `;
-    const result = await runAppleScript(script);
-    const [appName, bundleId] = result.trim().split("|||");
-    return { appName, bundleId };
-  },
-};
-
-const BrowserService = {
-  async getActiveTabURL(appName: string | null) {
-    if (!appName || !CONFIG.browserApps.includes(appName as BrowserApp)) return null;
-    try {
-      const tabs = await BrowserExtension.getTabs();
-      const activeTab = tabs.find((tab) => tab.active);
-      return activeTab?.url ?? null;
-    } catch {
-      return null;
-    }
-  },
-};
 
 // Main Component
 export default function Command() {
-  const handleCapture = async () => {
-    try {
-      await FileService.ensureDirectory(CONFIG.saveDir);
+  const [capturedData, setCapturedData] = useState<CapturedData | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-      // Gather all context data
-      const { appName, bundleId } = await WindowService.getActiveAppInfo();
-      let selectedText: string | null = null;
-      let frontAppName: string | null = null;
+  useLayoutEffect(() => {
+    const handleCapture = async () => {
       try {
-        selectedText = await getSelectedText();
-        const frontMostApp = await getFrontmostApplication();
-        frontAppName = frontMostApp.name;
-      } catch {
-        // If no text is selected, try clipboard as fallback
-        selectedText = (await Clipboard.readText()) ?? null;
+        const data = await captureContext();
+        setCapturedData(data);
+      } catch (error) {
+        console.error("Capture failed:", error);
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Capture Failed",
+          message: String(error),
+        });
+      } finally {
+        setIsLoading(false);
       }
-      const activeURL = await BrowserService.getActiveTabURL(appName);
-      const timestamp = new Date().toISOString();
+    };
 
-      const contextData: CapturedData = {
-        selectedText,
-        activeAppBundleId: bundleId,
-        activeAppName: appName,
-        activeURL,
-        timestamp,
-        frontAppName,
-      };
+    handleCapture();
+  }, []);
 
-      const jsonPath = FileService.getTimestampedPath(CONFIG.saveDir, "context-data", "json");
-      await FileService.saveJSON(jsonPath, contextData);
-      await showToast({
-        style: Toast.Style.Success,
-        title: "Context Captured",
-        message: `Saved to ${jsonPath}`,
-      });
-    } catch (error) {
-      console.error("Capture failed:", error);
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Capture Failed",
-        message: String(error),
-      });
-    }
+  const handleSave = async () => {
+    if (!capturedData) return;
+
+    const jsonPath = FileService.getTimestampedPath(CONFIG.saveDir, "context-data", "json");
+    await FileService.saveJSON(jsonPath, capturedData);
+    await showToast({
+      style: Toast.Style.Success,
+      title: "Context Captured",
+      message: `Saved to ${path.basename(jsonPath)}`,
+    });
   };
 
+  if (isLoading) {
+    return <List isLoading={true} />;
+  }
+
   return (
-    <Form
+    <List
+      isShowingDetail
+      searchBarPlaceholder="Captured context will appear here..."
       actions={
         <ActionPanel>
-          <Action title="Capture Context" onAction={handleCapture} />
+          <Action.SubmitForm title="Save Context" onSubmit={handleSave} shortcut={{ modifiers: ["cmd"], key: "s" }} />
+          <Action
+            title="Refresh Capture"
+            onAction={async () => {
+              setIsLoading(true);
+              try {
+                const data = await captureContext();
+                setCapturedData(data);
+              } catch (error) {
+                console.error("Capture failed:", error);
+                await showToast({
+                  style: Toast.Style.Failure,
+                  title: "Capture Failed",
+                  message: String(error),
+                });
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            shortcut={{ modifiers: ["cmd"], key: "r" }}
+          />
         </ActionPanel>
       }
     >
-      <Form.Description text="Press ⌘↩ to capture the context." />
-    </Form>
+      <List.Item
+        title="Current Context"
+        detail={capturedData ? <PreviewMetadata data={capturedData} /> : null}
+        actions={
+          <ActionPanel>
+            <Action.SubmitForm title="Save Context" onSubmit={handleSave} shortcut={{ modifiers: ["cmd"], key: "s" }} />
+            <Action
+              title="Refresh Capture"
+              onAction={async () => {
+                setIsLoading(true);
+                try {
+                  const data = await captureContext();
+                  setCapturedData(data);
+                } catch (error) {
+                  console.error("Capture failed:", error);
+                  await showToast({
+                    style: Toast.Style.Failure,
+                    title: "Capture Failed",
+                    message: String(error),
+                  });
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              shortcut={{ modifiers: ["cmd"], key: "r" }}
+            />
+          </ActionPanel>
+        }
+      />
+    </List>
   );
 }
