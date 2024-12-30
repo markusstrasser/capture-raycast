@@ -1,5 +1,6 @@
-import { showToast, Toast } from "@raycast/api";
+import { showToast, Toast, closeMainWindow, popToRoot } from "@raycast/api";
 import { FileService, captureContext, CONFIG } from "./utils";
+import type { CapturedData } from "./utils";
 import * as path from "node:path";
 
 export default async function Command() {
@@ -12,11 +13,15 @@ export default async function Command() {
     const jsonPath = FileService.getTimestampedPath(CONFIG.saveDir, "context-data", "json");
     await FileService.saveJSON(jsonPath, capturedData);
 
+    // Show success toast
     await showToast({
       style: Toast.Style.Success,
       title: "Context Captured",
-      message: `Saved to ${path.basename(jsonPath)}`,
+      message: "⌘K to add a comment",
     });
+
+    // Return to root
+    await popToRoot();
   } catch (error) {
     console.error("Quick capture failed:", error);
     await showToast({

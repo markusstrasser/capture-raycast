@@ -22,6 +22,8 @@ export interface CapturedData {
   frontAppName: string | null;
   screenshotPath: string | null;
   browserTabHTML?: string | null;
+  comment?: string;
+  tags?: string[];
 }
 
 // Services
@@ -88,16 +90,8 @@ export const BrowserService = {
 
   async getActiveTabHTML(appName: string | null): Promise<string | null> {
     if (!appName || !CONFIG.browserApps.includes(appName as BrowserApp)) return null;
-
-    const script = `
-      tell application "${appName}"
-        set currentTab to active tab of front window
-        return execute currentTab javascript "document.documentElement.outerHTML"
-      end tell
-    `;
-
     try {
-      return await runAppleScript(script);
+      return await BrowserExtension.getContent({ format: "html" });
     } catch (error) {
       console.error("Failed to capture HTML:", error);
       return null;

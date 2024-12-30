@@ -1,5 +1,6 @@
 import { showToast, Toast, ActionPanel, Action, List } from "@raycast/api";
-import { captureContext, CapturedData, FileService, CONFIG } from "./utils";
+import { captureContext, FileService, CONFIG } from "./utils";
+import type { CapturedData } from "./utils";
 import * as path from "node:path";
 import { useState, useLayoutEffect } from "react";
 

@@ -17,7 +17,26 @@
       "name": "quick-capture",
       "title": "Quick Capture Context",
       "description": "Silently capture current context",
-      "mode": "no-view"
+      "mode": "no-view",
+      "keywords": [
+        "snap",
+        "screenshot",
+        "save"
+      ],
+      "arguments": [
+        {
+          "name": "addComment",
+          "type": "text",
+          "placeholder": "Optional comment to add",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "add-comment",
+      "title": "Add Capture Comment",
+      "description": "Add comments and tags to your captures",
+      "mode": "view"
     }
   ],
   "dependencies": {
