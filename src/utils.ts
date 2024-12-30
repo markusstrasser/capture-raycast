@@ -58,6 +58,25 @@ export const FileService = {
       return null;
     }
   },
+
+  async captureAreaScreenshot(saveDir: string, timestamp: string): Promise<string | null> {
+    try {
+      const outputPath = path.join(saveDir, `screenshot-${timestamp}.png`);
+      // -i for interactive (area selection), -s for silent mode
+      const script = `do shell script "screencapture -i -s '${outputPath}'"`;
+      await runAppleScript(script);
+
+      try {
+        await fs.access(outputPath);
+        return outputPath;
+      } catch {
+        return null;
+      }
+    } catch (error) {
+      console.error("Area screenshot capture failed:", error);
+      return null;
+    }
+  },
 };
 
 export const WindowService = {
