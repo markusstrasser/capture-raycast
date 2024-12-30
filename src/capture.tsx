@@ -6,6 +6,7 @@ import {
   Clipboard,
   ActionPanel,
   Action,
+  getFrontmostApplication,
   getSelectedText,
 } from "@raycast/api";
 import { runAppleScript } from "@raycast/utils";
@@ -28,6 +29,7 @@ interface CapturedData {
   activeAppName: string | null;
   activeURL: string | null;
   timestamp: string;
+  frontAppName: string | null;
 }
 
 // Services
@@ -84,8 +86,11 @@ export default function Command() {
       // Gather all context data
       const { appName, bundleId } = await WindowService.getActiveAppInfo();
       let selectedText: string | null = null;
+      let frontAppName: string | null = null;
       try {
         selectedText = await getSelectedText();
+        const frontMostApp = await getFrontmostApplication();
+        frontAppName = frontMostApp.name;
       } catch {
         // If no text is selected, try clipboard as fallback
         selectedText = (await Clipboard.readText()) ?? null;
@@ -99,6 +104,7 @@ export default function Command() {
         activeAppName: appName,
         activeURL,
         timestamp,
+        frontAppName,
       };
 
       const jsonPath = FileService.getTimestampedPath(CONFIG.saveDir, "context-data", "json");
