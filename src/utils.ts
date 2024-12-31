@@ -14,16 +14,26 @@ export type BrowserApp = (typeof CONFIG.browserApps)[number];
 
 // Types
 export interface CapturedData {
-  clipboardText: string | null;
-  activeAppBundleId: string | null;
-  activeAppName: string | null;
-  activeURL: string | null;
-  timestamp: string;
-  frontAppName: string | null;
-  screenshotPath: string | null;
-  browserTabHTML?: string | null;
-  comment?: string;
-  tags?: string[];
+  // Content
+  content: {
+    text: string | null; // Previously clipboardText
+    html: string | null; // Previously browserTabHTML
+    screenshot: string | null; // Previously screenshotPath
+  };
+
+  // Source info
+  source: {
+    app: string | null; // Previously activeAppName
+    bundleId: string | null; // Previously activeAppBundleId
+    url: string | null; // Previously activeURL
+    window: string | null; // Previously frontAppName
+  };
+
+  // Metadata
+  metadata: {
+    timestamp: string;
+    comment?: string;
+  };
 }
 
 // Services
@@ -138,13 +148,19 @@ export async function captureContext(): Promise<CapturedData> {
   const browserTabHTML = await BrowserService.getActiveTabHTML(appName);
 
   return {
-    clipboardText,
-    activeAppBundleId: bundleId,
-    activeAppName: appName,
-    activeURL,
-    timestamp,
-    frontAppName,
-    screenshotPath,
-    browserTabHTML,
+    content: {
+      text: clipboardText,
+      html: browserTabHTML,
+      screenshot: screenshotPath,
+    },
+    source: {
+      app: appName,
+      bundleId,
+      url: activeURL,
+      window: frontAppName,
+    },
+    metadata: {
+      timestamp,
+    },
   };
 }

@@ -7,7 +7,6 @@ import { useState, useEffect, useCallback } from "react";
 
 interface FormValues {
   comment: string;
-  tags: string;
 }
 
 interface CaptureFile {
@@ -18,8 +17,8 @@ interface CaptureFile {
 
 function CaptureDetail({ data }: { data: CapturedData }) {
   const markdown = `
-${data.clipboardText ? `${data.clipboardText}\n\n` : "No content captured\n\n"}
-${data.screenshotPath ? `![Screenshot](${data.screenshotPath})\n` : ""}
+${data.content.text ? `${data.content.text}\n\n` : "No content captured\n\n"}
+${data.content.screenshot ? `![Screenshot](${data.content.screenshot})\n` : ""}
 `;
 
   return (
@@ -27,30 +26,33 @@ ${data.screenshotPath ? `![Screenshot](${data.screenshotPath})\n` : ""}
       markdown={markdown}
       metadata={
         <List.Item.Detail.Metadata>
-          <List.Item.Detail.Metadata.Label title="Timestamp" text={new Date(data.timestamp).toLocaleString()} />
+          <List.Item.Detail.Metadata.Label
+            title="Timestamp"
+            text={new Date(data.metadata.timestamp).toLocaleString()}
+          />
           <List.Item.Detail.Metadata.Separator />
 
-          <List.Item.Detail.Metadata.Label title="Source" text={data.activeAppName || "Unknown"} />
-          <List.Item.Detail.Metadata.Label title="Bundle ID" text={data.activeAppBundleId || "None"} />
+          <List.Item.Detail.Metadata.Label title="Source" text={data.source.app || "Unknown"} />
+          <List.Item.Detail.Metadata.Label title="Bundle ID" text={data.source.bundleId || "None"} />
 
-          {data.activeURL && (
+          {data.source.url && (
             <>
               <List.Item.Detail.Metadata.Separator />
-              <List.Item.Detail.Metadata.Link title="URL" target={data.activeURL} text={data.activeURL} />
+              <List.Item.Detail.Metadata.Link title="URL" target={data.source.url} text={data.source.url} />
             </>
           )}
 
-          {data.comment && (
+          {data.metadata.comment && (
             <>
               <List.Item.Detail.Metadata.Separator />
-              <List.Item.Detail.Metadata.Label title="Comment" text={data.comment} />
+              <List.Item.Detail.Metadata.Label title="Comment" text={data.metadata.comment} />
             </>
           )}
 
-          {data.browserTabHTML && (
+          {data.content.html && (
             <>
               <List.Item.Detail.Metadata.Separator />
-              <List.Item.Detail.Metadata.Label title="HTML Preview" text={`${data.browserTabHTML.slice(0, 200)}...`} />
+              <List.Item.Detail.Metadata.Label title="HTML Preview" text={`${data.content.html.slice(0, 200)}...`} />
             </>
           )}
         </List.Item.Detail.Metadata>
@@ -67,14 +69,13 @@ function CommentForm({ capture, onCommentSaved }: { capture: CaptureFile; onComm
       setIsSubmitting(true);
       const updatedData = {
         ...capture.data,
-        comment: values.comment,
-        tags: values.tags
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
+        metadata: {
+          ...capture.data.metadata,
+          comment: values.comment,
+        },
       };
       await FileService.saveJSON(capture.path, updatedData);
-      await showHUD("✓ Added comment and tags");
+      await showHUD("✓ Added comment");
       onCommentSaved?.();
       await popToRoot();
     } catch (error) {
@@ -100,18 +101,12 @@ function CommentForm({ capture, onCommentSaved }: { capture: CaptureFile; onComm
         id="comment"
         title="Comment"
         placeholder="Add any notes about this capture..."
-        defaultValue={capture.data.comment}
+        defaultValue={capture.data.metadata.comment}
         enableMarkdown
-      />
-      <Form.TextField
-        id="tags"
-        title="Tags"
-        placeholder="tag1, tag2, tag3"
-        defaultValue={capture.data.tags?.join(", ")}
       />
       <Form.Description
         title="Capture Info"
-        text={`${capture.data.activeAppName} - ${new Date(capture.data.timestamp).toLocaleString()}`}
+        text={`${capture.data.source.app} - ${new Date(capture.data.metadata.timestamp).toLocaleString()}`}
       />
     </Form>
   );
@@ -135,7 +130,7 @@ export default function Command() {
         captureFiles.push({
           path: filePath,
           data,
-          timestamp: new Date(data.timestamp),
+          timestamp: new Date(data.metadata.timestamp),
         });
       }
 
@@ -172,23 +167,19 @@ export default function Command() {
   return (
     <List isLoading={isLoading} searchBarPlaceholder="Search captures..." isShowingDetail>
       {captures.map((capture) => {
-        const date = new Date(capture.data.timestamp);
+        const date = new Date(capture.data.metadata.timestamp);
         const timeString = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         const dateString = date.toLocaleDateString([], { month: "short", day: "numeric" });
 
-        const icon = capture.data.browserTabHTML ? "🌐" : "🗒️";
+        const icon = capture.data.content.html ? "🌐" : "🗒️";
 
         return (
           <List.Item
             key={capture.path}
             icon={icon}
-            title={`${timeString} - ${capture.data.activeAppName || "Unknown"}`}
-            subtitle={capture.data.clipboardText?.slice(0, 50)}
-            accessories={[
-              { text: dateString },
-              ...(capture.data.tags?.length ? [{ text: `#${capture.data.tags[0]}` }] : []),
-              ...(capture.data.comment ? [{ icon: "💭" }] : []),
-            ]}
+            title={`${timeString} - ${capture.data.source.app || "Unknown"}`}
+            subtitle={capture.data.content.text?.slice(0, 50)}
+            accessories={[{ text: dateString }, ...(capture.data.metadata.comment ? [{ icon: "💭" }] : [])]}
             detail={<CaptureDetail data={capture.data} />}
             actions={
               <ActionPanel>
@@ -197,17 +188,17 @@ export default function Command() {
                   target={<CommentForm capture={capture} onCommentSaved={loadCaptures} />}
                   shortcut={{ modifiers: ["cmd"], key: "e" }}
                 />
-                {capture.data.activeURL && (
+                {capture.data.source.url && (
                   <Action.OpenInBrowser
                     title="Open URL"
-                    url={capture.data.activeURL}
+                    url={capture.data.source.url}
                     shortcut={{ modifiers: ["cmd"], key: "o" }}
                   />
                 )}
-                {capture.data.screenshotPath && (
+                {capture.data.content.screenshot && (
                   <Action.Open
                     title="Open Screenshot"
-                    target={capture.data.screenshotPath}
+                    target={capture.data.content.screenshot}
                     shortcut={{ modifiers: ["cmd"], key: "s" }}
                   />
                 )}

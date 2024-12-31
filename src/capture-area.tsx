@@ -25,10 +25,21 @@ export default function Command() {
 
       // Save metadata with comment
       const metadata = {
-        timestamp,
-        screenshotPath,
-        comment: values.comment,
-        type: "area-capture",
+        content: {
+          text: null,
+          html: null,
+          screenshot: screenshotPath,
+        },
+        source: {
+          app: null,
+          bundleId: null,
+          url: null,
+          window: null,
+        },
+        metadata: {
+          timestamp,
+          comment: values.comment,
+        },
       };
 
       const jsonPath = FileService.getTimestampedPath(CONFIG.saveDir, "area-capture", "json");

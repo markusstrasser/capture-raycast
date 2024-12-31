@@ -9,12 +9,12 @@ function PreviewMetadata({ data }: { data: CapturedData }) {
   const markdown = `
 # Captured Context
 
-${data.clipboardText ? `**Clipboard Content:**\n${data.clipboardText}\n` : ""}
-${data.activeAppName ? `**Active App:** ${data.activeAppName}\n` : ""}
-${data.activeURL ? `**Active URL:** ${data.activeURL}\n` : ""}
-**Timestamp:** ${new Date(data.timestamp).toLocaleString()}
-${data.screenshotPath ? `\n![Screenshot](${data.screenshotPath})\n` : ""}
-${data.browserTabHTML ? `\n**Browser Tab HTML Preview:**\n\`\`\`html\n${data.browserTabHTML.slice(0, 500)}...\n\`\`\`\n` : ""}
+${data.content.text ? `**Clipboard Content:**\n${data.content.text}\n` : ""}
+${data.source.app ? `**Active App:** ${data.source.app}\n` : ""}
+${data.source.url ? `**Active URL:** ${data.source.url}\n` : ""}
+**Timestamp:** ${new Date(data.metadata.timestamp).toLocaleString()}
+${data.content.screenshot ? `\n![Screenshot](${data.content.screenshot})\n` : ""}
+${data.content.html ? `\n**Browser Tab HTML Preview:**\n\`\`\`html\n${data.content.html.slice(0, 500)}...\n\`\`\`\n` : ""}
 `;
 
   return (
@@ -22,27 +22,27 @@ ${data.browserTabHTML ? `\n**Browser Tab HTML Preview:**\n\`\`\`html\n${data.bro
       markdown={markdown}
       metadata={
         <List.Item.Detail.Metadata>
-          <List.Item.Detail.Metadata.Label title="Application" text={data.activeAppName || "None"} />
-          {data.activeURL && (
+          <List.Item.Detail.Metadata.Label title="Application" text={data.source.app || "None"} />
+          {data.source.url && (
             <>
               <List.Item.Detail.Metadata.Separator />
-              <List.Item.Detail.Metadata.Link title="URL" target={data.activeURL} text={data.activeURL} />
+              <List.Item.Detail.Metadata.Link title="URL" target={data.source.url} text={data.source.url} />
             </>
           )}
-          {data.screenshotPath && (
+          {data.content.screenshot && (
             <>
               <List.Item.Detail.Metadata.Separator />
               <List.Item.Detail.Metadata.Label title="Screenshot" text="✓ Captured" />
             </>
           )}
-          {data.browserTabHTML && (
+          {data.content.html && (
             <>
               <List.Item.Detail.Metadata.Separator />
               <List.Item.Detail.Metadata.Label title="HTML Content" text="✓ Captured" />
             </>
           )}
           <List.Item.Detail.Metadata.Separator />
-          <List.Item.Detail.Metadata.Label title="Bundle ID" text={data.activeAppBundleId || "None"} />
+          <List.Item.Detail.Metadata.Label title="Bundle ID" text={data.source.bundleId || "None"} />
         </List.Item.Detail.Metadata>
       }
     />
