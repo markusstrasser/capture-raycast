@@ -5,6 +5,7 @@ import {
   showToast as raycastShowToast,
   Toast,
   getPreferenceValues,
+  getSelectedText,
 } from "@raycast/api";
 import { runAppleScript } from "@raycast/utils";
 import * as fs from "node:fs/promises";
@@ -20,7 +21,7 @@ interface Preferences {
 export const CONFIG = {
   saveDir: getPreferenceValues<Preferences>().captureDirectory.replace("~", os.homedir()),
   screenshotsDir: getPreferenceValues<Preferences>().screenshotsDirectory.replace("~", os.homedir()),
-  browserApps: ["Arc", "Brave", "Chrome", "Safari", "Firefox"] as const,
+  browserApps: ["Arc", "Brave", "Chrome", "Safari", "Firefox", "Orion"] as const,
 } as const;
 
 export type BrowserApp = (typeof CONFIG.browserApps)[number];
@@ -132,21 +133,53 @@ export const WindowService = {
 export const BrowserService = {
   async getActiveTabURL(appName: string | null) {
     if (!appName || !CONFIG.browserApps.includes(appName as BrowserApp)) return null;
+
     try {
+      console.debug("Getting tabs for browser:", appName);
       const tabs = await BrowserExtension.getTabs();
-      const activeTab = tabs.find((tab) => tab.active);
-      return activeTab?.url ?? null;
-    } catch {
+      console.debug("Got tabs:", JSON.stringify(tabs, null, 2));
+
+      // Get all active tabs
+      const activeTabs = tabs.filter((tab) => tab.active);
+      console.debug("Active tabs:", activeTabs);
+
+      // If multiple active tabs, try to match with the current window title
+      if (activeTabs.length > 1) {
+        const script = `
+          tell application "${appName}"
+            return title of active tab of front window
+          end tell
+        `;
+        try {
+          const currentTitle = await runAppleScript(script);
+          console.debug("Current window title:", currentTitle);
+          const matchingTab = activeTabs.find((tab) => tab.title === currentTitle);
+          if (matchingTab) return matchingTab.url;
+        } catch (error) {
+          console.debug("Failed to get current window title:", error);
+        }
+      }
+
+      // Fallback to first active tab if we couldn't match by title
+      return activeTabs[0]?.url ?? null;
+    } catch (error) {
+      console.debug(`Failed to get URL for ${appName}:`, error);
       return null;
     }
   },
 
   async getActiveTabHTML(appName: string | null): Promise<string | null> {
     if (!appName || !CONFIG.browserApps.includes(appName as BrowserApp)) return null;
+
     try {
-      return await BrowserExtension.getContent({ format: "html" });
+      const content = await BrowserExtension.getContent({ format: "markdown" });
+      if (content) {
+        console.debug("Got content length:", content.length);
+      }
+      return content;
     } catch (error) {
-      console.error("Failed to capture HTML:", error);
+      // Silently handle content capture failures (PDFs, etc)
+      console.debug(`Content capture not available for ${appName}`);
       return null;
     }
   },
@@ -186,20 +219,23 @@ export async function captureContext(): Promise<CapturedData> {
 
   // Gather all other context
   const { appName, bundleId } = await WindowService.getActiveAppInfo();
-  const clipboardText = (await Clipboard.readText()) ?? null;
   const frontMostApp = await getFrontmostApplication();
   const frontAppName = frontMostApp.name;
   const activeURL = await BrowserService.getActiveTabURL(appName);
+
+  // Try to get selected text, fallback to null if none selected
+  let selectedText: string | null = null;
+  try {
+    selectedText = await getSelectedText();
+    console.info("Selected text:", selectedText);
+  } catch (error) {
+    console.info("No text selected");
+  }
 
   // Capture HTML if in browser
   const browserTabHTML = await BrowserService.getActiveTabHTML(appName);
 
   return {
-    content: {
-      text: clipboardText,
-      html: browserTabHTML,
-      screenshot: screenshotPath,
-    },
     source: {
       app: appName,
       bundleId,
@@ -208,6 +244,11 @@ export async function captureContext(): Promise<CapturedData> {
     },
     metadata: {
       timestamp,
+    },
+    content: {
+      text: selectedText,
+      html: browserTabHTML,
+      screenshot: screenshotPath,
     },
   };
 }
