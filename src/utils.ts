@@ -1,4 +1,10 @@
-import { BrowserExtension, Clipboard, getFrontmostApplication } from "@raycast/api";
+import {
+  BrowserExtension,
+  Clipboard,
+  getFrontmostApplication,
+  showToast as raycastShowToast,
+  Toast,
+} from "@raycast/api";
 import { runAppleScript } from "@raycast/utils";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -125,6 +131,29 @@ export const BrowserService = {
       console.error("Failed to capture HTML:", error);
       return null;
     }
+  },
+};
+
+export const ToastService = {
+  async showCapturing() {
+    return raycastShowToast({ style: Toast.Style.Animated, title: "Capturing context..." });
+  },
+
+  async showSuccess(message?: string) {
+    return raycastShowToast({
+      style: Toast.Style.Success,
+      title: "Context Captured",
+      message: message ?? "⌘K to add a comment",
+    });
+  },
+
+  async showError(error: unknown) {
+    console.error("Capture failed:", error);
+    return raycastShowToast({
+      style: Toast.Style.Failure,
+      title: "Capture Failed",
+      message: String(error),
+    });
   },
 };
 
