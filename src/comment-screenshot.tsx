@@ -1,10 +1,11 @@
-import { List, ActionPanel, Action, showToast, Toast } from "@raycast/api";
+import { List, ActionPanel, Action, showToast, Toast, getPreferenceValues } from "@raycast/api";
 import { useState, useEffect, useCallback } from "react";
 import { FileService, CONFIG, WindowService } from "./utils";
 import type { CapturedData } from "./utils";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
+import { watch } from "node:fs";
 import { CaptureDetail } from "./components/CaptureDetail";
 import { CommentForm } from "./components/CommentForm";
 
@@ -20,6 +21,7 @@ export default function Command() {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadCaptures = useCallback(async () => {
+    setIsLoading(true);
     try {
       // Ensure screenshots directory exists
       await FileService.ensureDirectory(CONFIG.screenshotsDir);
@@ -132,9 +134,49 @@ export default function Command() {
     }
   }, []);
 
+  // Watch for file changes in the screenshots directory
+  useEffect(() => {
+    const watcher = watch(CONFIG.screenshotsDir, (eventType, filename) => {
+      if (filename && !filename.startsWith(".")) {
+        console.log("File change detected:", eventType, filename);
+        loadCaptures();
+      }
+    });
+
+    return () => {
+      watcher.close();
+    };
+  }, [loadCaptures]);
+
+  // Initial load
   useEffect(() => {
     loadCaptures();
   }, [loadCaptures]);
+
+  const preferenceActions = (
+    <>
+      <Action.OpenInBrowser
+        title="Change Screenshots Directory"
+        icon="🖼️"
+        url="raycast://preferences/extensions/capture?preferences=screenshotsDirectory"
+        shortcut={{ modifiers: ["cmd", "shift"], key: "s" }}
+        onOpen={loadCaptures}
+      />
+      <Action.OpenInBrowser
+        title="Change Capture Directory"
+        icon="📁"
+        url="raycast://preferences/extensions/capture?preferences=captureDirectory"
+        shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
+        onOpen={loadCaptures}
+      />
+      <Action
+        title="Refresh Screenshots"
+        icon="↻"
+        onAction={loadCaptures}
+        shortcut={{ modifiers: ["cmd"], key: "r" }}
+      />
+    </>
+  );
 
   if (captures.length === 0 && !isLoading) {
     return (
@@ -142,6 +184,7 @@ export default function Command() {
         <List.EmptyView
           title="No screenshots found"
           description={`Make sure your screenshots are saved to ${CONFIG.screenshotsDir}`}
+          actions={<ActionPanel>{preferenceActions}</ActionPanel>}
         />
       </List>
     );
@@ -164,18 +207,21 @@ export default function Command() {
             detail={<CaptureDetail data={capture.data} />}
             actions={
               <ActionPanel>
-                <Action.Push
-                  title="Add/Edit Comment"
-                  target={
-                    <CommentForm data={capture.data} filePath={capture.metadataPath} onCommentSaved={loadCaptures} />
-                  }
-                  shortcut={{ modifiers: ["cmd"], key: "e" }}
-                />
-                <Action.Open
-                  title="Open Screenshot"
-                  target={capture.path}
-                  shortcut={{ modifiers: ["cmd"], key: "o" }}
-                />
+                <ActionPanel.Section>
+                  <Action.Push
+                    title="Add/Edit Comment"
+                    target={
+                      <CommentForm data={capture.data} filePath={capture.metadataPath} onCommentSaved={loadCaptures} />
+                    }
+                    shortcut={{ modifiers: ["cmd"], key: "e" }}
+                  />
+                  <Action.Open
+                    title="Open Screenshot"
+                    target={capture.path}
+                    shortcut={{ modifiers: ["cmd"], key: "o" }}
+                  />
+                </ActionPanel.Section>
+                <ActionPanel.Section>{preferenceActions}</ActionPanel.Section>
               </ActionPanel>
             }
           />
