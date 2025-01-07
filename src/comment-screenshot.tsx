@@ -4,12 +4,9 @@ import { FileService, CONFIG, WindowService } from "./utils";
 import type { CapturedData } from "./utils";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
-import type { Stats } from "node:fs";
 import * as os from "node:os";
 import { CaptureDetail } from "./components/CaptureDetail";
 import { CommentForm } from "./components/CommentForm";
-
-const SCREENSHOTS_DIR = path.join(os.homedir(), "Desktop", "Screenshots");
 
 interface CaptureFile {
   path: string;
@@ -25,14 +22,14 @@ export default function Command() {
   const loadCaptures = useCallback(async () => {
     try {
       // Ensure screenshots directory exists
-      await FileService.ensureDirectory(SCREENSHOTS_DIR);
+      await FileService.ensureDirectory(CONFIG.screenshotsDir);
 
       // Ensure metadata directory exists
-      const metadataDir = path.join(SCREENSHOTS_DIR, ".metadata");
+      const metadataDir = path.join(CONFIG.screenshotsDir, ".metadata");
       await FileService.ensureDirectory(metadataDir);
 
       // Get all image files
-      const files = await fs.readdir(SCREENSHOTS_DIR);
+      const files = await fs.readdir(CONFIG.screenshotsDir);
       console.log("All files in directory:", files);
 
       // Filter out hidden files and directories, match any image extension
@@ -44,16 +41,16 @@ export default function Command() {
       console.log("Filtered image files:", imageFiles);
 
       if (imageFiles.length === 0) {
-        console.log("No images found in", SCREENSHOTS_DIR);
+        console.log("No images found in", CONFIG.screenshotsDir);
       }
 
       const captureFiles: CaptureFile[] = [];
       for (const file of imageFiles) {
         console.log("Processing file:", file);
-        const filePath = path.join(SCREENSHOTS_DIR, file);
+        const filePath = path.join(CONFIG.screenshotsDir, file);
         const metadataPath = path.join(metadataDir, `${file}.json`);
 
-        let stats: fs.Stats;
+        let stats: { size: number; mtime: Date; birthtime: Date };
         try {
           stats = await fs.stat(filePath);
           console.log("File stats:", { size: stats.size, mtime: stats.mtime });
@@ -65,19 +62,49 @@ export default function Command() {
         let data: CapturedData;
         try {
           const content = await fs.readFile(metadataPath, "utf-8");
-          data = JSON.parse(content);
+          const parsedData = JSON.parse(content);
+
+          // Handle legacy data format
+          if (!parsedData.metadata) {
+            data = {
+              content: {
+                text: parsedData.clipboardText || null,
+                html: parsedData.browserTabHTML || null,
+                screenshot: parsedData.screenshotPath || `file://${filePath}`,
+              },
+              source: {
+                app: parsedData.activeAppName || null,
+                bundleId: parsedData.activeAppBundleId || null,
+                url: parsedData.activeURL || null,
+                window: parsedData.frontAppName || null,
+              },
+              metadata: {
+                timestamp: parsedData.timestamp || stats.birthtime.toISOString(),
+                comment: parsedData.comment,
+              },
+            };
+          } else {
+            data = parsedData;
+          }
         } catch {
           // If no metadata exists, create new metadata
           const { appName, bundleId } = await WindowService.getActiveAppInfo();
+          const timestamp = stats.birthtime.toISOString();
           data = {
-            timestamp: stats.birthtime.toISOString(),
-            screenshotPath: `file://${filePath}`,
-            activeAppName: appName,
-            activeAppBundleId: bundleId,
-            activeURL: null,
-            clipboardText: null,
-            frontAppName: appName,
-            browserTabHTML: null,
+            content: {
+              text: null,
+              html: null,
+              screenshot: `file://${filePath}`,
+            },
+            source: {
+              app: appName,
+              bundleId: bundleId,
+              url: null,
+              window: appName,
+            },
+            metadata: {
+              timestamp: timestamp,
+            },
           };
           await FileService.saveJSON(metadataPath, data);
         }
@@ -86,7 +113,7 @@ export default function Command() {
           path: filePath,
           metadataPath,
           data,
-          timestamp: new Date(data.timestamp),
+          timestamp: new Date(data.metadata.timestamp),
         });
       }
 
@@ -98,7 +125,7 @@ export default function Command() {
       await showToast({
         style: Toast.Style.Failure,
         title: "Failed to Load Screenshots",
-        message: `Make sure ${SCREENSHOTS_DIR} exists and is accessible`,
+        message: `Make sure ${CONFIG.screenshotsDir} exists and is accessible`,
       });
     } finally {
       setIsLoading(false);
@@ -114,7 +141,7 @@ export default function Command() {
       <List>
         <List.EmptyView
           title="No screenshots found"
-          description={`Make sure your screenshots are saved to ${SCREENSHOTS_DIR}`}
+          description={`Make sure your screenshots are saved to ${CONFIG.screenshotsDir}`}
         />
       </List>
     );
@@ -123,7 +150,7 @@ export default function Command() {
   return (
     <List isLoading={isLoading} searchBarPlaceholder="Search screenshots..." isShowingDetail>
       {captures.map((capture) => {
-        const date = new Date(capture.data.timestamp);
+        const date = new Date(capture.data.metadata.timestamp);
         const timeString = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         const dateString = date.toLocaleDateString([], { month: "short", day: "numeric" });
 
@@ -132,8 +159,8 @@ export default function Command() {
             key={capture.path}
             icon="🖼️"
             title={path.basename(capture.path)}
-            subtitle={capture.data.comment?.slice(0, 50)}
-            accessories={[{ text: dateString }, ...(capture.data.comment ? [{ icon: "💭" }] : [])]}
+            subtitle={capture.data.metadata.comment?.slice(0, 50)}
+            accessories={[{ text: dateString }, ...(capture.data.metadata.comment ? [{ icon: "💭" }] : [])]}
             detail={<CaptureDetail data={capture.data} />}
             actions={
               <ActionPanel>

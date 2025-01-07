@@ -3,8 +3,8 @@ import type { CapturedData } from "../utils";
 
 export function CaptureDetail({ data }: { data: CapturedData }) {
   const markdown = `
-${data.clipboardText ? `${data.clipboardText}\n\n` : ""}
-${data.screenshotPath ? `![Screenshot](${data.screenshotPath})\n` : ""}
+${data.content.text ? `${data.content.text}\n\n` : ""}
+${data.content.screenshot ? `![Screenshot](${data.content.screenshot})\n` : ""}
 `;
 
   return (
@@ -12,30 +12,33 @@ ${data.screenshotPath ? `![Screenshot](${data.screenshotPath})\n` : ""}
       markdown={markdown}
       metadata={
         <List.Item.Detail.Metadata>
-          <List.Item.Detail.Metadata.Label title="Timestamp" text={new Date(data.timestamp).toLocaleString()} />
+          <List.Item.Detail.Metadata.Label
+            title="Timestamp"
+            text={new Date(data.metadata.timestamp).toLocaleString()}
+          />
           <List.Item.Detail.Metadata.Separator />
 
-          <List.Item.Detail.Metadata.Label title="Source" text={data.activeAppName || "Unknown"} />
-          <List.Item.Detail.Metadata.Label title="Bundle ID" text={data.activeAppBundleId || "None"} />
+          <List.Item.Detail.Metadata.Label title="Source" text={data.source.app || "Unknown"} />
+          <List.Item.Detail.Metadata.Label title="Bundle ID" text={data.source.bundleId || "None"} />
 
-          {data.activeURL && (
+          {data.source.url && (
             <>
               <List.Item.Detail.Metadata.Separator />
-              <List.Item.Detail.Metadata.Link title="URL" target={data.activeURL} text={data.activeURL} />
+              <List.Item.Detail.Metadata.Link title="URL" target={data.source.url} text={data.source.url} />
             </>
           )}
 
-          {data.comment && (
+          {data.metadata.comment && (
             <>
               <List.Item.Detail.Metadata.Separator />
-              <List.Item.Detail.Metadata.Label title="Comment" text={data.comment} />
+              <List.Item.Detail.Metadata.Label title="Comment" text={data.metadata.comment} />
             </>
           )}
 
-          {data.browserTabHTML && (
+          {data.content.html && (
             <>
               <List.Item.Detail.Metadata.Separator />
-              <List.Item.Detail.Metadata.Label title="HTML Preview" text={`${data.browserTabHTML.slice(0, 200)}...`} />
+              <List.Item.Detail.Metadata.Label title="HTML Preview" text={`${data.content.html.slice(0, 200)}...`} />
             </>
           )}
         </List.Item.Detail.Metadata>

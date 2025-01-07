@@ -21,7 +21,10 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
       setIsSubmitting(true);
       const updatedData = {
         ...data,
-        comment: values.comment,
+        metadata: {
+          ...data.metadata,
+          comment: values.comment,
+        },
       };
       await FileService.saveJSON(filePath, updatedData);
       await showHUD("✓ Added comment");
@@ -52,12 +55,12 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
         id="comment"
         title="Comment"
         placeholder="Add any notes about this capture..."
-        defaultValue={data.comment}
+        defaultValue={data.metadata.comment}
         enableMarkdown
       />
       <Form.Description
         title="Capture Info"
-        text={`${data.activeAppName || "Unknown"} - ${new Date(data.timestamp).toLocaleString()}`}
+        text={`${data.source.app || "Unknown"} - ${new Date(data.metadata.timestamp).toLocaleString()}`}
       />
     </Form>
   );

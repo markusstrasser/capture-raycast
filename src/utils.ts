@@ -4,15 +4,22 @@ import {
   getFrontmostApplication,
   showToast as raycastShowToast,
   Toast,
+  getPreferenceValues,
 } from "@raycast/api";
 import { runAppleScript } from "@raycast/utils";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
 
+interface Preferences {
+  screenshotsDirectory: string;
+  captureDirectory: string;
+}
+
 // Configuration
 export const CONFIG = {
-  saveDir: path.join(os.homedir(), "Documents/MIND/", "CaptureInbox"),
+  saveDir: getPreferenceValues<Preferences>().captureDirectory.replace("~", os.homedir()),
+  screenshotsDir: getPreferenceValues<Preferences>().screenshotsDirectory.replace("~", os.homedir()),
   browserApps: ["Arc", "Brave", "Chrome", "Safari", "Firefox"] as const,
 } as const;
 
@@ -40,6 +47,17 @@ export interface CapturedData {
     timestamp: string;
     comment?: string;
   };
+
+  // Legacy fields for backward compatibility
+  timestamp?: string;
+  comment?: string;
+  clipboardText?: string | null;
+  browserTabHTML?: string | null;
+  screenshotPath?: string | null;
+  activeAppName?: string | null;
+  activeAppBundleId?: string | null;
+  activeURL?: string | null;
+  frontAppName?: string | null;
 }
 
 // Services

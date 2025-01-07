@@ -36,6 +36,24 @@
       ]
     }
   ],
+  "preferences": [
+    {
+      "name": "screenshotsDirectory",
+      "title": "Screenshots Directory",
+      "description": "Directory where screenshots are stored",
+      "type": "directory",
+      "default": "~/Desktop/Screenshots",
+      "required": true
+    },
+    {
+      "name": "captureDirectory",
+      "title": "Capture Directory",
+      "description": "Directory where captures are stored",
+      "type": "directory",
+      "default": "~/Documents/MIND/CaptureInbox",
+      "required": true
+    }
+  ],
   "dependencies": {
     "@raycast/api": "^1.88.4",
     "@raycast/utils": "^1.17.0",
