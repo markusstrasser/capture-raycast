@@ -9,7 +9,7 @@ bun.lockb
 yarn.lock
 .yarn/
 .yarnrc.yml
-
+package-lock.json
 # Build outputs
 dist/
 build/
