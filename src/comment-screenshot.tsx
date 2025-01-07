@@ -1,10 +1,9 @@
-import { List, ActionPanel, Action, showToast, Toast, getPreferenceValues } from "@raycast/api";
+import { List, ActionPanel, Action, showToast, Toast } from "@raycast/api";
 import { useState, useEffect, useCallback } from "react";
 import { FileService, CONFIG, WindowService } from "./utils";
 import type { CapturedData } from "./utils";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import { watch } from "node:fs";
 import { CaptureDetail } from "./components/CaptureDetail";
 import { CommentForm } from "./components/CommentForm";
@@ -194,7 +193,6 @@ export default function Command() {
     <List isLoading={isLoading} searchBarPlaceholder="Search screenshots..." isShowingDetail>
       {captures.map((capture) => {
         const date = new Date(capture.data.metadata.timestamp);
-        const timeString = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         const dateString = date.toLocaleDateString([], { month: "short", day: "numeric" });
 
         return (
@@ -209,7 +207,7 @@ export default function Command() {
               <ActionPanel>
                 <ActionPanel.Section>
                   <Action.Push
-                    title="Add/Edit Comment"
+                    title="Add or Edit Comment"
                     target={
                       <CommentForm data={capture.data} filePath={capture.metadataPath} onCommentSaved={loadCaptures} />
                     }

@@ -184,7 +184,7 @@ export default function Command() {
             actions={
               <ActionPanel>
                 <Action.Push
-                  title="Add/Edit Comment"
+                  title="Add or Edit Comment"
                   target={<CommentForm capture={capture} onCommentSaved={loadCaptures} />}
                   shortcut={{ modifiers: ["cmd"], key: "e" }}
                 />

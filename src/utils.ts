@@ -1,11 +1,9 @@
 import {
   BrowserExtension,
-  Clipboard,
   getFrontmostApplication,
   showToast as raycastShowToast,
   Toast,
   getPreferenceValues,
-  getSelectedText,
   closeMainWindow,
   popToRoot,
 } from "@raycast/api";

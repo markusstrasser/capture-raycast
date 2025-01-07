@@ -9,7 +9,7 @@
   "commands": [
     {
       "name": "capture",
-      "title": "Capture [only use by hotkey!]",
+      "title": "Capture [Only Use By Hotkey!]",
       "description": "Silently capture current context [USE HOTKEY!]",
       "mode": "no-view",
       "keywords": [

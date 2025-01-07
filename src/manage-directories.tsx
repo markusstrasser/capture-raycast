@@ -1,31 +1,11 @@
-import {
-  Form,
-  ActionPanel,
-  Action,
-  showToast,
-  Toast,
-  getPreferenceValues,
-  useNavigation,
-  openExtensionPreferences,
-  Icon,
-} from "@raycast/api";
+import { Form, ActionPanel, Action, showToast, Toast, openExtensionPreferences, Icon } from "@raycast/api";
 import { useState } from "react";
 import { CONFIG } from "./utils";
-import * as os from "node:os";
-
-interface FormValues {
-  screenshotsDirectory: string;
-  captureDirectory: string;
-}
 
 export default function Command() {
-  const { pop } = useNavigation();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get current values from preferences
-  const prefs = getPreferenceValues<FormValues>();
-
-  async function handleSubmit(values: FormValues) {
+  async function handleSubmit() {
     try {
       setIsSubmitting(true);
       await showToast({ style: Toast.Style.Success, title: "Opening preferences..." });
