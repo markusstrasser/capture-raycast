@@ -9,5 +9,9 @@ raycast-env.d.ts
 .swiftpm
 compiled_raycast_swift
 
+bun.lockb
+package-lock.json
+pnpm-lock.yaml
+
 # misc
 .DS_Store
