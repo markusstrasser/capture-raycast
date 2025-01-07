@@ -2,7 +2,6 @@ import { Form, ActionPanel, Action, showHUD, popToRoot, showToast, Toast } from 
 import { useState } from "react";
 import { FileService } from "../utils";
 import type { CapturedData } from "../utils";
-import * as path from "node:path";
 
 interface FormValues {
   comment: string;
