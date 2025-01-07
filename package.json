@@ -54,7 +54,7 @@
       "title": "Screenshots Directory",
       "description": "Directory where screenshots are stored",
       "type": "directory",
-      "default": "~/Desktop/Screenshots",
+      "default": "~/Desktop/",
       "required": true
     },
     {
@@ -62,7 +62,7 @@
       "title": "Capture Directory",
       "description": "Directory where captures are stored",
       "type": "directory",
-      "default": "~/Documents/MIND/CaptureInbox",
+      "default": "~/Downloads/",
       "required": true
     }
   ],
