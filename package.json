@@ -9,50 +9,25 @@
   "commands": [
     {
       "name": "capture",
-      "title": "Capture Context",
-      "description": "Capture current context with preview",
-      "mode": "view"
-    },
-    {
-      "name": "quick-capture",
-      "title": "Quick Capture Context",
+      "title": "Quick Capture",
       "description": "Silently capture current context",
       "mode": "no-view",
       "keywords": [
         "snap",
         "screenshot",
         "save"
-      ],
-      "arguments": [
-        {
-          "name": "addComment",
-          "type": "text",
-          "placeholder": "Optional comment to add",
-          "required": false
-        }
       ]
     },
     {
-      "name": "capture-area",
-      "title": "Capture Screen Area",
-      "description": "Capture a selected screen area with comment",
-      "mode": "view",
-      "keywords": [
-        "screenshot",
-        "area",
-        "selection"
-      ]
-    },
-    {
-      "name": "add-comment",
-      "title": "Add Capture Comment",
-      "description": "Add comments and tags to your captures",
+      "name": "comment-capture",
+      "title": "Comment Captures",
+      "description": "Add comments to your captures",
       "mode": "view"
     },
     {
-      "name": "add-cleanshot-comment",
-      "title": "Add CleanShot Comment",
-      "description": "Add comments to CleanShot screenshots",
+      "name": "comment-screenshot",
+      "title": "Comment Screenshots",
+      "description": "Add comments to recent Screenshots",
       "mode": "view",
       "keywords": [
         "cleanshot",
