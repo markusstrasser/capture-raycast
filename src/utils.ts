@@ -6,7 +6,7 @@ import * as os from "node:os";
 
 // Configuration
 export const CONFIG = {
-  saveDir: path.join(os.homedir(), "Downloads", "raycast-captures"),
+  saveDir: path.join(os.homedir(), "Documents/MIND/", "CaptureInbox"),
   browserApps: ["Arc", "Brave", "Chrome", "Safari", "Firefox"] as const,
 } as const;
 
