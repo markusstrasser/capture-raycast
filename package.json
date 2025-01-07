@@ -19,6 +19,12 @@
       ]
     },
     {
+      "name": "clipboard-capture",
+      "title": "Clipboard Capture",
+      "description": "Capture text from clipboard",
+      "mode": "no-view"
+    },
+    {
       "name": "comment-capture",
       "title": "Comment Captures",
       "description": "Add comments to your captures",

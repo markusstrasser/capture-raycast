@@ -6,6 +6,8 @@ import {
   Toast,
   getPreferenceValues,
   getSelectedText,
+  closeMainWindow,
+  popToRoot,
 } from "@raycast/api";
 import { runAppleScript } from "@raycast/utils";
 import * as fs from "node:fs/promises";
@@ -208,47 +210,96 @@ export const ToastService = {
   },
 };
 
-export async function captureContext(): Promise<CapturedData> {
-  // Capture timestamp early for consistent naming
-  const timestamp = new Date().toISOString();
-  const formattedTimestamp = timestamp.replace(/:/g, "-");
+export const CaptureService = {
+  async gatherContext() {
+    const { appName, bundleId } = await WindowService.getActiveAppInfo();
+    const frontMostApp = await getFrontmostApplication();
+    const frontAppName = frontMostApp.name;
+    const activeURL = await BrowserService.getActiveTabURL(appName);
+    const browserTabHTML = await BrowserService.getActiveTabHTML(appName);
 
-  // Start screenshot capture
-  await FileService.ensureDirectory(CONFIG.saveDir);
-  const screenshotPath = await FileService.captureScreenshot(CONFIG.saveDir, formattedTimestamp);
-
-  // Gather all other context
-  const { appName, bundleId } = await WindowService.getActiveAppInfo();
-  const frontMostApp = await getFrontmostApplication();
-  const frontAppName = frontMostApp.name;
-  const activeURL = await BrowserService.getActiveTabURL(appName);
-
-  // Try to get selected text, fallback to null if none selected
-  let selectedText: string | null = null;
-  try {
-    selectedText = await getSelectedText();
-    console.info("Selected text:", selectedText);
-  } catch (error) {
-    console.info("No text selected");
-  }
-
-  // Capture HTML if in browser
-  const browserTabHTML = await BrowserService.getActiveTabHTML(appName);
-
-  return {
-    source: {
-      app: appName,
+    return {
+      appName,
       bundleId,
-      url: activeURL,
-      window: frontAppName,
-    },
-    metadata: {
-      timestamp,
-    },
-    content: {
-      text: selectedText,
-      html: browserTabHTML,
-      screenshot: screenshotPath,
-    },
-  };
-}
+      frontAppName,
+      activeURL,
+      browserTabHTML,
+    };
+  },
+
+  async createCaptureData({
+    text = null,
+    html = null,
+    screenshot = null,
+    timestamp = new Date().toISOString(),
+  }: {
+    text?: string | null;
+    html?: string | null;
+    screenshot?: string | null;
+    timestamp?: string;
+  }): Promise<CapturedData> {
+    const context = await this.gatherContext();
+
+    return {
+      content: {
+        text,
+        html: html ?? context.browserTabHTML,
+        screenshot,
+      },
+      source: {
+        app: context.appName,
+        bundleId: context.bundleId,
+        url: context.activeURL,
+        window: context.frontAppName,
+      },
+      metadata: {
+        timestamp,
+      },
+    };
+  },
+
+  async capture<T>({
+    type,
+    getData,
+    validate,
+  }: {
+    type: string;
+    getData: () => Promise<T>;
+    validate?: (data: T) => boolean | string;
+  }) {
+    try {
+      await ToastService.showCapturing();
+
+      // Get data
+      const data = await getData();
+
+      // Validate if needed
+      if (validate) {
+        const validationResult = validate(data);
+        if (validationResult !== true) {
+          throw new Error(typeof validationResult === "string" ? validationResult : "Validation failed");
+        }
+      }
+
+      // Ensure directory exists
+      await FileService.ensureDirectory(CONFIG.saveDir);
+
+      // Create capture data
+      const timestamp = new Date().toISOString();
+      const captureData = await this.createCaptureData({
+        ...(typeof data === "string" ? { text: data } : data),
+        timestamp,
+      });
+
+      // Save to file
+      const jsonPath = FileService.getTimestampedPath(CONFIG.saveDir, `${type}-capture`, "json");
+      await FileService.saveJSON(jsonPath, captureData);
+
+      await ToastService.showSuccess();
+      await closeMainWindow();
+      await popToRoot();
+    } catch (error) {
+      await ToastService.showError(error);
+    }
+  },
+};
