@@ -8,6 +8,8 @@ Capture content with extra screen and app context, including
 - frontmost app
 - IF using browser: url, markdown/html of the active tab
 
+Plus, the option to add comments to captures and screenshots. Personally, I use this as a workflow to save and comment points of interest for an AI to analyze.
+
 ## Commands
 
 I recommend using `Capture` and `Clipboard Capture` via hotkey.
@@ -32,6 +34,8 @@ And the context in json\*:
 
 \*html --> markdown in the newer version
 
+> Sorry, this should've been a flat json instead
+
 ```json
 {
   "content": {
@@ -50,6 +54,10 @@ And the context in json\*:
   }
 }
 ```
+
+If I then want to add a comment to the capture I can use the `Comment Captures` command.
+
+![comment](./example/screenshot_Cursor_58.png)
 
 ## Configuration
 
