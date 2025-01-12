@@ -187,13 +187,7 @@ export const utils = {
       await utils.ensureDirectory(saveDir);
       const outputPath = path.join(saveDir, `screenshot-${timestamp}.png`);
       await runAppleScript(`do shell script "screencapture -x '${outputPath}'"`);
-
-      try {
-        await fs.access(outputPath);
-        return outputPath;
-      } catch {
-        return null;
-      }
+      return outputPath;
     } catch (error) {
       console.error("Screenshot capture failed:", { error });
       return null;
@@ -258,7 +252,9 @@ export async function createCapture(
   try {
     await utils.showToast({ style: Toast.Style.Animated, title: "Capturing context..." });
 
-    const data = await getData();
+    // Run getData and getActiveWindowInfo in parallel
+    const [data, context] = await Promise.all([getData(), utils.getActiveWindowInfo()]);
+
     console.debug("Raw capture data:", { data });
 
     if (validate) {
@@ -268,10 +264,10 @@ export async function createCapture(
       }
     }
 
-    const timestamp = new Date().toISOString();
-    const context = await utils.getActiveWindowInfo();
+    // Get browser content only if needed
     const browserContent = utils.isSupportedBrowser(context.app) ? await utils.getActiveTabContent(context.app) : null;
 
+    const timestamp = new Date().toISOString();
     const captureData: CapturedData = {
       id: uuidv4(),
       type,
@@ -283,12 +279,14 @@ export async function createCapture(
       title: context.title ?? null,
     };
 
+    // Create file path and save in parallel
     const filePath = utils.getTimestampedPath(CONFIG.directories.captures, type, "json");
-    await utils.saveJSON(filePath, captureData);
+    await Promise.all([
+      utils.saveJSON(filePath, captureData),
+      utils.showToast({ style: Toast.Style.Success, title: "Context Captured", message: "⌘K to add a comment" }),
+    ]);
 
-    await utils.showToast({ style: Toast.Style.Success, title: "Context Captured", message: "⌘K to add a comment" });
     await closeMainWindow();
-
     return captureData;
   } catch (error) {
     console.error("Capture failed:", { error });
