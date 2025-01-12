@@ -41,6 +41,8 @@ export interface CaptureContext {
   bundleId: string | null;
   url: string | null;
   window: string | null;
+  favicon?: string | null;
+  title?: string | null;
 }
 
 export interface CapturedData extends Required<CaptureContext> {
@@ -171,22 +173,29 @@ export const WindowService = {
     const result = await runAppleScript(script);
     const [appName, bundleId] = result.trim().split("|||");
     const frontMostApp = await getFrontmostApplication();
-    const url = CONFIG.supportedBrowsers.includes(appName as BrowserApp)
-      ? await BrowserService.getActiveTabURL(appName)
-      : null;
+
+    const tabInfo = CONFIG.supportedBrowsers.includes(appName as BrowserApp)
+      ? await BrowserService.getActiveTabInfo(appName)
+      : { url: null, title: null, favicon: null };
 
     return {
       app: appName,
       bundleId,
-      url,
+      url: tabInfo.url,
       window: frontMostApp.name,
+      title: tabInfo.title,
+      favicon: tabInfo.favicon,
     };
   },
 };
 
 export const BrowserService = {
-  async getActiveTabURL(appName: string | null) {
-    if (!appName || !CONFIG.supportedBrowsers.includes(appName as BrowserApp)) return null;
+  async getActiveTabInfo(
+    appName: string | null,
+  ): Promise<{ url: string | null; title: string | null; favicon: string | null }> {
+    if (!appName || !CONFIG.supportedBrowsers.includes(appName as BrowserApp)) {
+      return { url: null, title: null, favicon: null };
+    }
 
     try {
       console.debug("Getting tabs for browser:", appName);
@@ -208,18 +217,33 @@ export const BrowserService = {
           const currentTitle = await runAppleScript(script);
           console.debug("Current window title:", currentTitle);
           const matchingTab = activeTabs.find((tab) => tab.title === currentTitle);
-          if (matchingTab) return matchingTab.url;
+          if (matchingTab) {
+            return {
+              url: matchingTab.url,
+              title: matchingTab.title,
+              favicon: matchingTab.favicon ?? null,
+            };
+          }
         } catch (error) {
           console.debug("Failed to get current window title:", error);
         }
       }
 
-      // Fallback to first active tab if we couldn't match by title
-      return activeTabs[0]?.url ?? null;
+      // Fallback to first active tab
+      const activeTab = activeTabs[0];
+      return {
+        url: activeTab?.url ?? null,
+        title: activeTab?.title ?? null,
+        favicon: activeTab?.favicon ?? null,
+      };
     } catch (error) {
-      console.debug(`Failed to get URL for ${appName}:`, error);
-      return null;
+      console.debug(`Failed to get tab info for ${appName}:`, error);
+      return { url: null, title: null, favicon: null };
     }
+  },
+
+  async getActiveTabURL(appName: string | null) {
+    return (await this.getActiveTabInfo(appName)).url;
   },
 
   async getActiveTabHTML(appName: string | null): Promise<string | null> {

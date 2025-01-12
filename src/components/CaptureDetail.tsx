@@ -10,12 +10,14 @@ export function CaptureDetail({ data }: CaptureDetailProps) {
     { label: "App", value: data.app },
     { label: "Bundle ID", value: data.bundleId },
     { label: "Window", value: data.window },
+    { label: "Title", value: data.title },
     { label: "URL", value: data.url },
     { label: "Timestamp", value: new Date(data.timestamp).toLocaleString() },
     { label: "Comment", value: data.comment },
   ].filter((item): item is { label: string; value: string } => Boolean(item.value));
 
   const markdown = [
+    data.favicon && `![Favicon](${data.favicon})`,
     data.selectedText && `**Selected Text**\n${data.selectedText}`,
     data.screenshotPath && `![Screenshot](${data.screenshotPath.replace(/^file:\/\//, "")})`,
     data.activeViewContent && `**Page Content**\n${data.activeViewContent}`,

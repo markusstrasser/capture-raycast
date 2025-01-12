@@ -14,6 +14,18 @@ import { CONFIG } from "./config";
 import type { BrowserApp, CaptureContext, CaptureInput, CapturedData, CaptureType } from "./types";
 import { handleError } from "./errors";
 
+interface CaptureData {
+  id: string;
+  type: string;
+  timestamp: string;
+  selectedText: string | null;
+  screenshotPath: string;
+  activeViewContent: string;
+  title: string | null;
+  favicon: string | null;
+  url: string | null;
+}
+
 export const FileService = {
   async ensureDirectory(dir: string) {
     console.debug("Ensuring directory exists:", dir);
@@ -27,11 +39,12 @@ export const FileService = {
   },
 
   async saveJSON(filePath: string, data: unknown) {
-    console.debug("Saving JSON to:", filePath);
+    const jsonString = JSON.stringify(data, null, 2);
+    console.log("About to save JSON data:", jsonString);
     const dir = path.dirname(filePath);
     await this.ensureDirectory(dir);
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2));
-    console.debug("Saved JSON successfully");
+    await fs.writeFile(filePath, jsonString);
+    console.log("Saved JSON successfully");
   },
 
   getTimestampedPath(base: string, name: string, ext: string) {
@@ -66,18 +79,37 @@ export const FileService = {
 
 export const CaptureManager = {
   async save(data: CapturedData) {
-    console.debug("Saving capture data:", JSON.stringify(data, null, 2));
+    console.log("Raw data received:", data);
+
+    // Double-check these fields in your logs
+    console.log("Data fields:", data);
+
+    // Ensure the final object includes them
+    const cleanData = {
+      id: data.id,
+      type: data.type,
+      timestamp: data.timestamp,
+      app: data.app,
+      bundleId: data.bundleId,
+      url: data.url,
+      window: data.window,
+      favicon: data.favicon,
+      title: data.title,
+      selectedText: data.selectedText,
+      screenshotPath: data.screenshotPath,
+      activeViewContent: data.activeViewContent,
+      comment: data.comment,
+    };
+
     const filePath = FileService.getTimestampedPath(CONFIG.directories.captures, data.type, "json");
-    console.debug("Saving to path:", filePath);
     await FileService.ensureDirectory(CONFIG.directories.captures);
-    await FileService.saveJSON(filePath, data);
+    await FileService.saveJSON(filePath, cleanData);
     return filePath;
   },
 
   async load(directory: string) {
     console.debug("Loading captures from directory:", directory);
     await FileService.ensureDirectory(directory);
-
     const files = await fs.readdir(directory);
     console.debug("Found files:", files);
 
@@ -91,18 +123,18 @@ export const CaptureManager = {
         try {
           const content = await fs.readFile(filePath, "utf-8");
           console.debug("Raw file content:", content);
-          const data = JSON.parse(content) as CapturedData;
-          console.debug("Parsed data:", data);
+          const parsedData = JSON.parse(content) as CapturedData;
+          console.debug("Parsed data:", parsedData);
 
-          if (!data.id || !data.timestamp || !data.type) {
-            console.debug("Skipping invalid capture:", data);
+          if (!parsedData.id || !parsedData.timestamp || !parsedData.type) {
+            console.debug("Skipping invalid capture:", parsedData);
             return null;
           }
 
           return {
             path: filePath,
-            data,
-            timestamp: new Date(data.timestamp),
+            data: parsedData,
+            timestamp: new Date(parsedData.timestamp),
           };
         } catch (error) {
           console.error("Failed to load capture:", filePath, error);
@@ -120,33 +152,55 @@ export const CaptureManager = {
 
 export const WindowService = {
   async getActiveAppInfo(): Promise<CaptureContext> {
-    const script = `
-      tell application "System Events"
-        set frontAppProcess to first application process whose frontmost is true
-        set frontAppName to name of frontAppProcess
-        set bundleID to id of frontAppProcess
-        return frontAppName & "|||" & bundleID
-      end tell
-    `;
-    const result = await runAppleScript(script);
-    const [appName, bundleId] = result.trim().split("|||");
+    console.log("Getting active app info...");
     const frontMostApp = await getFrontmostApplication();
-    const url = CONFIG.supportedBrowsers.includes(appName as BrowserApp)
-      ? await BrowserService.getActiveTabURL(appName)
-      : null;
+    console.log("Got frontmost app:", JSON.stringify(frontMostApp, null, 2));
+    const appName = frontMostApp.name;
+    const bundleId = frontMostApp.bundleId ?? null;
 
-    return {
+    let url = null;
+    let favicon = null;
+    let title = null;
+
+    console.log("Checking if browser:", appName, "is in supported list:", CONFIG.supportedBrowsers);
+    if (CONFIG.supportedBrowsers.includes(appName as BrowserApp)) {
+      console.log("Getting tab info for browser:", appName);
+      const tab = await BrowserService.getActiveTabInfo(appName);
+      console.log("Got tab result:", JSON.stringify(tab, null, 2));
+      if (tab) {
+        console.log("Got active tab:", JSON.stringify(tab, null, 2));
+        url = tab.url ?? null;
+        favicon = tab.favicon ?? null;
+        title = tab.title ?? null;
+        console.log("Values before creating context:", { url, favicon, title });
+      } else {
+        console.log("No tab info returned");
+      }
+    } else {
+      console.log("Not a supported browser");
+    }
+
+    const context: CaptureContext = {
       app: appName,
       bundleId,
       url,
       window: frontMostApp.name,
+      favicon,
+      title,
     };
+
+    console.log("Generated context:", JSON.stringify(context, null, 2));
+    return context;
   },
 };
 
 export const BrowserService = {
-  async getActiveTabURL(appName: string | null) {
-    if (!appName || !CONFIG.supportedBrowsers.includes(appName as BrowserApp)) return null;
+  async getActiveTabInfo(appName: string | null) {
+    console.debug("BrowserService.getActiveTabInfo called with:", appName);
+    if (!appName || !CONFIG.supportedBrowsers.includes(appName as BrowserApp)) {
+      console.debug("Invalid browser app:", appName);
+      return null;
+    }
 
     try {
       console.debug("Getting tabs for browser:", appName);
@@ -155,31 +209,59 @@ export const BrowserService = {
 
       // Get all active tabs
       const activeTabs = tabs.filter((tab) => tab.active);
-      console.debug("Active tabs:", activeTabs);
+      console.debug("Active tabs:", JSON.stringify(activeTabs, null, 2));
 
-      // If multiple active tabs, try to match with the current window title
-      if (activeTabs.length > 1) {
-        const script = `
-          tell application "${appName}"
-            return title of active tab of front window
-          end tell
-        `;
-        try {
-          const currentTitle = await runAppleScript(script);
-          console.debug("Current window title:", currentTitle);
-          const matchingTab = activeTabs.find((tab) => tab.title === currentTitle);
-          if (matchingTab) return matchingTab.url;
-        } catch (error) {
-          console.debug("Failed to get current window title:", error);
+      // If there's only one active tab, use it
+      if (activeTabs.length === 1) {
+        console.debug("Single active tab found:", activeTabs[0]);
+        return activeTabs[0];
+      }
+
+      console.debug("Multiple active tabs found, getting content to match");
+      const content = await BrowserExtension.getContent({ format: "markdown" });
+      if (content) {
+        console.debug("Got content length:", content.length);
+        console.debug("Content preview:", content.substring(0, 200));
+
+        // First try exact URL matches
+        for (const tab of activeTabs) {
+          if (tab.url && content.includes(tab.url)) {
+            console.debug("Found exact URL match:", tab);
+            return tab;
+          }
+        }
+
+        // Then try title matches
+        for (const tab of activeTabs) {
+          if (tab.title && content.includes(tab.title)) {
+            console.debug("Found title match:", tab);
+            return tab;
+          }
+        }
+
+        // Try partial URL matches as last resort
+        for (const tab of activeTabs) {
+          if (tab.url) {
+            const urlWithoutProtocol = tab.url.replace(/^https?:\/\//, "");
+            if (content.includes(urlWithoutProtocol)) {
+              console.debug("Found partial URL match:", tab);
+              return tab;
+            }
+          }
         }
       }
 
-      // Fallback to first active tab if we couldn't match by title
-      return activeTabs[0]?.url ?? null;
+      console.debug("No matching tab found, using first active tab");
+      return activeTabs[0] ?? null;
     } catch (error) {
-      console.debug(`Failed to get URL for ${appName}:`, error);
+      console.debug(`Failed to get tab info for ${appName}:`, error);
       return null;
     }
+  },
+
+  async getActiveTabURL(appName: string | null) {
+    const tab = await this.getActiveTabInfo(appName);
+    return tab?.url ?? null;
   },
 
   async getActiveTabHTML(appName: string | null): Promise<string | null> {
@@ -218,15 +300,49 @@ export const ToastService = {
 };
 
 export const CaptureService = {
-  async createCapture(type: CaptureType, getData: () => Promise<CaptureInput>) {
+  async createCaptureData(
+    type: string,
+    selectedText: string | null,
+    screenshotPath: string,
+    activeViewContent: string,
+  ): Promise<CaptureData> {
+    const context = await WindowService.getActiveAppInfo();
+    console.debug("Got content length:", activeViewContent.length);
+
+    const captureData: CaptureData = {
+      id: crypto.randomUUID(),
+      type,
+      timestamp: new Date().toISOString(),
+      selectedText,
+      screenshotPath,
+      activeViewContent,
+      title: context.title,
+      favicon: context.favicon,
+      url: context.url,
+    };
+
+    console.debug("Created capture data:", captureData);
+    return captureData;
+  },
+
+  async createCapture(type: CaptureType, getData: () => Promise<CaptureInput>): Promise<CapturedData> {
     const timestamp = new Date().toISOString();
     const data = await getData();
     const context = await WindowService.getActiveAppInfo();
+    console.log("Got context in createCapture:", JSON.stringify(context, null, 2));
+    console.log("Context fields:", {
+      app: context.app,
+      bundleId: context.bundleId,
+      url: context.url,
+      window: context.window,
+      favicon: context.favicon,
+      title: context.title,
+    });
     const browserContent = CONFIG.supportedBrowsers.includes(context.app as BrowserApp)
       ? await BrowserService.getActiveTabHTML(context.app)
       : null;
 
-    return {
+    const captureData = {
       id: uuidv4(),
       type,
       timestamp,
@@ -234,39 +350,9 @@ export const CaptureService = {
       screenshotPath: data.screenshotPath ?? null,
       activeViewContent: data.activeViewContent ?? browserContent,
       ...context,
-    };
-  },
+    } as CapturedData;
 
-  async capture(
-    type: CaptureType,
-    getData: () => Promise<CaptureInput>,
-    validate?: (data: CaptureInput) => boolean | string,
-  ) {
-    try {
-      await ToastService.showCapturing();
-
-      // Get data
-      const data = await getData();
-      console.debug("Raw capture data:", data);
-
-      // Validate if needed
-      if (validate) {
-        const validationResult = validate(data);
-        if (validationResult !== true) {
-          throw new Error(typeof validationResult === "string" ? validationResult : "Validation failed");
-        }
-      }
-
-      // Create and save capture
-      const captureData = await this.createCapture(type, async () => data);
-      console.debug("Created capture data:", JSON.stringify(captureData, null, 2));
-      await CaptureManager.save(captureData);
-
-      await ToastService.showSuccess();
-      await closeMainWindow();
-      await popToRoot();
-    } catch (error) {
-      await ToastService.showError(error);
-    }
+    console.log("Final capture data:", JSON.stringify(captureData, null, 2));
+    return captureData;
   },
 };

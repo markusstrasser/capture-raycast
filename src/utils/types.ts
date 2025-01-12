@@ -14,9 +14,11 @@ export interface CaptureContext {
   bundleId: string | null;
   url: string | null;
   window: string | null;
+  favicon: string | null;
+  title: string | null;
 }
 
-export interface CapturedData extends Required<CaptureContext> {
+export interface CapturedData extends CaptureContext {
   id: string;
   type: CaptureType;
   timestamp: string;
