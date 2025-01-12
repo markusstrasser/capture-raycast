@@ -3,6 +3,8 @@ import type { CapturedData } from "../utils";
 import * as path from "node:path";
 import { PreferenceActions } from "./PreferenceActions";
 import { CommentForm } from "./CommentForm";
+import { data as dataUtils } from "../utils";
+import { getFavicon } from "@raycast/utils";
 
 export interface CaptureFile {
   path: string;
@@ -19,6 +21,13 @@ interface CaptureListProps {
   onRefresh?: () => void;
   onCommentSaved?: () => void;
 }
+
+const getItemIcon = (capture: CapturedData) => {
+  if (capture.url) {
+    return getFavicon(capture.url, { fallback: "🌐" });
+  }
+  return capture.activeViewContent ? "🌐" : "🗒️";
+};
 
 export function CaptureList({
   captures,
@@ -50,28 +59,13 @@ export function CaptureList({
     const date = new Date(capture.data.timestamp);
     const timeString = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const dateString = date.toLocaleDateString([], { month: "short", day: "numeric" });
-    const icon = capture.data.favicon || (capture.data.activeViewContent ? "🌐" : "🗒️");
+    const icon = getItemIcon(capture.data);
     const title =
       capture.data.title || path.basename(capture.path).startsWith("screenshot-")
         ? path.basename(capture.path)
         : `${timeString} - ${capture.data.app || "Unknown"}`;
 
-    const metadata = [
-      { label: "Type", value: capture.data.type },
-      { label: "Timestamp", value: date.toLocaleString() },
-      { label: "App", value: capture.data.app },
-      { label: "Bundle ID", value: capture.data.bundleId },
-      { label: "Window", value: capture.data.window },
-    ].filter((item): item is { label: string; value: string } => Boolean(item.value));
-
-    if (capture.data.selectedText?.trim()) {
-      metadata.push({ label: "Selected Text", value: capture.data.selectedText.trim() });
-    }
-
-    if (capture.data.comment) {
-      metadata.push({ label: "Comment", value: capture.data.comment });
-    }
-
+    const metadata = dataUtils.getCaptureMetadata(capture.data);
     const markdown = capture.data.screenshotPath
       ? `![Screenshot](${capture.data.screenshotPath.replace(/^file:\/\//, "")})`
       : undefined;

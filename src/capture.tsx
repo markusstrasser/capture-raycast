@@ -1,10 +1,10 @@
 import { getSelectedText } from "@raycast/api";
-import { capture, screenshot, CONFIG } from "./utils";
+import { capture, screenshot, CONFIG, paths } from "./utils";
 
 export default async function Command() {
   await capture.save("selection", async () => {
-    const timestamp = new Date().toISOString().replace(/:/g, "-");
-    const screenshotPath = await screenshot.capture(CONFIG.directories.captures, timestamp);
+    const timestamp = new Date().toISOString();
+    const screenshotPath = await screenshot.capture(CONFIG.directories.captures, paths.sanitizeTimestamp(timestamp));
 
     let selectedText: string | null = null;
     try {
@@ -15,7 +15,7 @@ export default async function Command() {
 
     return {
       selectedText,
-      screenshotPath,
+      screenshotPath: screenshotPath ? paths.getFileUrl(screenshotPath) : null,
     };
   });
 }

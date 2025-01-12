@@ -1,10 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
-import { files, CONFIG } from "./utils";
+import { files, CONFIG, data as dataUtils, paths } from "./utils";
 import type { CapturedData } from "./utils";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import { watch } from "node:fs";
 import { CaptureList, type CaptureFile } from "./components/CaptureList";
+
+const getFileStats = async (directory: string, file: string) => {
+  const filePath = path.join(directory, file);
+  try {
+    const stats = await fs.stat(filePath);
+    return { file, path: filePath, stats };
+  } catch (error) {
+    console.error("Failed to stat file:", file, error);
+    return null;
+  }
+};
 
 export default function Command() {
   const [captures, setCaptures] = useState<CaptureFile[]>([]);
@@ -13,60 +24,39 @@ export default function Command() {
   const loadCaptures = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Ensure screenshots directory exists
       await files.ensureDirectory(CONFIG.directories.screenshots);
 
-      // Get all image files
       const allFiles = await fs.readdir(CONFIG.directories.screenshots);
       console.debug("All files in directory:", allFiles);
 
-      // Filter out hidden files and directories, match any image extension
-      const imageFiles = allFiles.filter(
-        (f) =>
-          !f.startsWith(".") && // Exclude hidden files/dirs
-          /\.(png|gif|mp4|jpg|jpeg|webp|heic)$/i.test(f), // Match any common image format
-      );
+      const imageFiles = allFiles.filter(paths.isImageFile);
       console.debug("Filtered image files:", imageFiles);
 
       if (imageFiles.length === 0) {
         console.debug("No images found in", CONFIG.directories.screenshots);
       }
 
-      // Get stats for all files in parallel
-      const captureFiles = await Promise.all(
-        imageFiles.map(async (file) => {
-          const filePath = path.join(CONFIG.directories.screenshots, file);
-          try {
-            const stats = await fs.stat(filePath);
-            return {
-              path: filePath,
-              data: {
-                id: file, // Use filename as ID for screenshots
-                type: "screenshot" as const,
-                timestamp: stats.mtime.toISOString(),
-                screenshotPath: `file://${filePath}`,
-                selectedText: null,
-                activeViewContent: null,
-                // Default context values - will be updated when capturing
-                app: "Screenshot",
-                bundleId: null,
-                url: null,
-                window: null,
-                favicon: null,
-                title: null,
-              } as CapturedData,
-              timestamp: stats.mtime,
-            };
-          } catch (error) {
-            console.error("Failed to stat file:", file, error);
-            return null;
-          }
-        }),
-      );
+      const fileStats = await Promise.all(imageFiles.map((file) => getFileStats(CONFIG.directories.screenshots, file)));
 
-      // Filter out failed loads and sort by timestamp
-      const validCaptures = captureFiles
-        .filter((c): c is NonNullable<typeof c> => c !== null)
+      const validCaptures = fileStats
+        .filter((s): s is NonNullable<typeof s> => s !== null)
+        .map(({ file, path: filePath, stats }) => ({
+          path: filePath,
+          data: dataUtils.createCaptureData(
+            "screenshot",
+            {
+              app: "Screenshot",
+              bundleId: null,
+              url: null,
+              window: null,
+            },
+            {
+              timestamp: stats.mtime.toISOString(),
+              screenshotPath: paths.getFileUrl(filePath),
+            },
+          ),
+          timestamp: stats.mtime,
+        }))
         .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
       console.debug("Sorted captures:", validCaptures);
@@ -79,7 +69,6 @@ export default function Command() {
     }
   }, []);
 
-  // Watch for file changes in the screenshots directory
   useEffect(() => {
     const watcher = watch(CONFIG.directories.screenshots, (eventType, filename) => {
       if (filename && !filename.startsWith(".")) {
@@ -93,7 +82,6 @@ export default function Command() {
     };
   }, [loadCaptures]);
 
-  // Initial load
   useEffect(() => {
     loadCaptures();
   }, [loadCaptures]);

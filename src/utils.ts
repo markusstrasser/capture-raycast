@@ -29,11 +29,10 @@ export interface CaptureContext {
   bundleId: string | null;
   url: string | null;
   window: string | null;
-  favicon?: string | null;
   title?: string | null;
 }
 
-export interface CapturedData extends Required<CaptureContext> {
+export interface CapturedData extends Required<Omit<CaptureContext, "title">> {
   id: string;
   type: CaptureType;
   timestamp: string;
@@ -41,7 +40,75 @@ export interface CapturedData extends Required<CaptureContext> {
   screenshotPath: string | null;
   activeViewContent: string | null;
   comment?: string;
+  title: string | null;
 }
+
+// Pure functions
+export const paths = {
+  sanitizeTimestamp: (timestamp: string) => timestamp.replace(/:/g, "-"),
+
+  createCapturePaths: (type: string, timestamp = new Date().toISOString()) => {
+    const sanitized = paths.sanitizeTimestamp(timestamp);
+    return {
+      image: path.join(CONFIG.directories.captures, `${type}-${sanitized}.png`),
+      json: path.join(CONFIG.directories.captures, `${type}-${sanitized}.json`),
+      getUrl: (p: string) => `file://${p}`,
+    };
+  },
+
+  isImageFile: (f: string) => !f.startsWith(".") && /\.(png|gif|mp4|jpg|jpeg|webp|heic)$/i.test(f),
+
+  getFileUrl: (filePath: string) => `file://${filePath}`,
+  stripFileProtocol: (url: string) => url.replace(/^file:\/\//, ""),
+};
+
+export const data = {
+  createCaptureData: (
+    type: CaptureType,
+    base: Partial<CaptureContext>,
+    options: {
+      timestamp?: string;
+      screenshotPath?: string | null;
+      comment?: string;
+      selectedText?: string | null;
+      activeViewContent?: string | null;
+    } = {},
+  ): CapturedData => ({
+    id: uuidv4(),
+    type,
+    timestamp: options.timestamp ?? new Date().toISOString(),
+    screenshotPath: options.screenshotPath ?? null,
+    selectedText: options.selectedText ?? null,
+    activeViewContent: options.activeViewContent ?? null,
+    comment: options.comment ?? undefined,
+    app: base.app ?? null,
+    bundleId: base.bundleId ?? null,
+    url: base.url ?? null,
+    window: base.window ?? null,
+    title: base.title ?? null,
+  }),
+
+  getCaptureMetadata: (capture: CapturedData) => {
+    const base = [
+      { label: "Type", value: capture.type },
+      { label: "Timestamp", value: new Date(capture.timestamp).toLocaleString() },
+      { label: "App", value: capture.app },
+      { label: "Bundle ID", value: capture.bundleId },
+      { label: "Window", value: capture.window },
+    ];
+
+    return [
+      ...base.filter((item): item is { label: string; value: string } => Boolean(item.value)),
+      ...(capture.selectedText?.trim() ? [{ label: "Selected Text", value: capture.selectedText.trim() }] : []),
+      ...(capture.comment ? [{ label: "Comment", value: capture.comment }] : []),
+    ];
+  },
+
+  shouldCopyScreenshot: (data: CapturedData, sourcePath: string) =>
+    data.type === "screenshot" &&
+    data.screenshotPath?.startsWith("file://") &&
+    sourcePath.startsWith(CONFIG.directories.screenshots),
+};
 
 // Configuration
 export const CONFIG = {
@@ -118,7 +185,7 @@ export const browser = {
 
   getActiveTabInfo: async (appName: string | null) => {
     if (!browser.isSupportedBrowser(appName)) {
-      return { url: null, title: null, favicon: null };
+      return { url: null, title: null };
     }
 
     try {
@@ -134,7 +201,6 @@ export const browser = {
             return {
               url: matchingTab.url ?? null,
               title: matchingTab.title ?? null,
-              favicon: matchingTab.favicon ?? null,
             };
           }
         } catch (error) {
@@ -146,11 +212,10 @@ export const browser = {
       return {
         url: activeTab?.url ?? null,
         title: activeTab?.title ?? null,
-        favicon: activeTab?.favicon ?? null,
       };
     } catch (error) {
       logger.debug("Failed to get tab info:", { browser: appName, error });
-      return { url: null, title: null, favicon: null };
+      return { url: null, title: null };
     }
   },
 
@@ -206,8 +271,7 @@ export const window = {
       bundleId,
       url: tabInfo.url,
       window: frontMostApp.name,
-      title: tabInfo.title,
-      favicon: tabInfo.favicon,
+      title: tabInfo.title ?? null,
     };
   },
 };
