@@ -125,8 +125,10 @@ export const utils = {
           const currentTitle = await runAppleScript(script);
           const matchingTab = activeTabs.find((tab) => tab.title === currentTitle);
           if (matchingTab) {
+            const url = matchingTab.url;
+            // Filter out mailto: and other problematic URLs
             return {
-              url: matchingTab.url ?? null,
+              url: url && !url.startsWith("mailto:") && !url.startsWith("about:") ? url : null,
               title: matchingTab.title ?? null,
             };
           }
@@ -136,8 +138,9 @@ export const utils = {
       }
 
       const activeTab = activeTabs[0];
+      const url = activeTab?.url;
       return {
-        url: activeTab?.url ?? null,
+        url: url && !url.startsWith("mailto:") && !url.startsWith("about:") ? url : null,
         title: activeTab?.title ?? null,
       };
     } catch (error) {
