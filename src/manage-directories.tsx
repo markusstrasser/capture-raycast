@@ -18,7 +18,7 @@ export default function Command() {
         message: String(error),
       });
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittming(false);
     }
   }
 

@@ -1,4 +1,4 @@
-import { Form, ActionPanel, Action, showHUD, showToast, Toast } from "@raycast/api";
+import { Form, ActionPanel, Action, showHUD, popToRoot, showToast, Toast } from "@raycast/api";
 import { useState } from "react";
 import { files, CONFIG, data as dataUtils, paths } from "../utils";
 import type { CapturedData } from "../utils";
@@ -46,16 +46,23 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
           console.debug("Copying screenshot to captures directory");
           await handleScreenshotComment(data, sourcePath, values.comment);
         } else {
-          const updatedData = dataUtils.createCaptureData(data.type, data, { comment: values.comment });
+          const updatedData = {
+            ...data,
+            comment: values.comment,
+          };
           await files.saveJSON(filePath, updatedData);
         }
       } else {
-        const updatedData = dataUtils.createCaptureData(data.type, data, { comment: values.comment });
+        const updatedData = {
+          ...data,
+          comment: values.comment,
+        };
         await files.saveJSON(filePath, updatedData);
       }
 
       await showHUD("✓ Added comment");
       onCommentSaved?.();
+      await popToRoot();
     } catch (error) {
       console.error("Failed to save comment:", error);
       await showToast({
