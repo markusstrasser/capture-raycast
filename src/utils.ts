@@ -216,6 +216,34 @@ export const utils = {
   async showToast(options: { style: Toast.Style; title: string; message?: string }): Promise<Toast> {
     return raycastShowToast(options);
   },
+
+  async handleComment(data: CapturedData, filePath: string, comment: string): Promise<void> {
+    if (data.type === "screenshot" && filePath.startsWith(CONFIG.directories.screenshots)) {
+      const timestamp = new Date().toISOString();
+      const imagePath = path.join(CONFIG.directories.captures, `screenshot-${utils.sanitizeTimestamp(timestamp)}.png`);
+      const jsonPath = path.join(CONFIG.directories.captures, `screenshot-${utils.sanitizeTimestamp(timestamp)}.json`);
+
+      if (!data.screenshotPath) {
+        throw new Error("Screenshot path is missing");
+      }
+
+      await utils.ensureDirectory(CONFIG.directories.captures);
+      await fs.copyFile(utils.stripFileProtocol(data.screenshotPath), imagePath);
+
+      const captureData: CapturedData = {
+        ...data,
+        id: path.basename(jsonPath, ".json"),
+        timestamp,
+        screenshotPath: utils.getFileUrl(imagePath),
+        comment,
+      };
+
+      await utils.saveJSON(jsonPath, captureData);
+    } else {
+      const updatedData = { ...data, comment };
+      await utils.saveJSON(filePath, updatedData);
+    }
+  },
 };
 
 // Simplified capture function
@@ -257,7 +285,6 @@ export async function createCapture(
 
     await utils.showToast({ style: Toast.Style.Success, title: "Context Captured", message: "⌘K to add a comment" });
     await closeMainWindow();
-    await popToRoot();
 
     return captureData;
   } catch (error) {
