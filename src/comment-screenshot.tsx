@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { FileService, CONFIG, WindowService } from "./utils";
+import { FileService, CONFIG } from "./utils";
 import type { CapturedData } from "./utils";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
@@ -32,41 +32,43 @@ export default function Command() {
         console.debug("No images found in", CONFIG.directories.screenshots);
       }
 
-      const captureFiles: CaptureFile[] = [];
-      for (const file of imageFiles) {
-        console.debug("Processing file:", file);
-        const filePath = path.join(CONFIG.directories.screenshots, file);
+      // Get stats for all files in parallel
+      const captureFiles = await Promise.all(
+        imageFiles.map(async (file) => {
+          const filePath = path.join(CONFIG.directories.screenshots, file);
+          try {
+            const stats = await fs.stat(filePath);
+            return {
+              path: filePath,
+              data: {
+                id: file, // Use filename as ID for screenshots
+                type: "screenshot" as const,
+                timestamp: stats.mtime.toISOString(),
+                screenshotPath: `file://${filePath}`,
+                selectedText: null,
+                activeViewContent: null,
+                // Default context values - will be updated when capturing
+                app: "Screenshot",
+                bundleId: null,
+                url: null,
+                window: null,
+              },
+              timestamp: stats.mtime,
+            };
+          } catch (error) {
+            console.error("Failed to stat file:", file, error);
+            return null;
+          }
+        }),
+      );
 
-        let stats: { mtime: Date };
-        try {
-          stats = await fs.stat(filePath);
-          console.debug("File stats:", { mtime: stats.mtime });
-        } catch (error) {
-          console.error("Failed to stat file:", file, error);
-          continue;
-        }
+      // Filter out failed loads and sort by timestamp
+      const validCaptures = captureFiles
+        .filter((c): c is NonNullable<typeof c> => c !== null)
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-        // Create basic capture data for display
-        const context = await WindowService.getActiveAppInfo();
-        captureFiles.push({
-          path: filePath,
-          data: {
-            id: file, // Use filename as ID for screenshots
-            type: "screenshot",
-            timestamp: stats.mtime.toISOString(),
-            screenshotPath: `file://${filePath}`,
-            selectedText: null,
-            activeViewContent: null,
-            ...context,
-          },
-          timestamp: stats.mtime,
-        });
-      }
-
-      // Sort by timestamp, newest first
-      captureFiles.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      console.debug("Sorted captures:", captureFiles);
-      setCaptures(captureFiles);
+      console.debug("Sorted captures:", validCaptures);
+      setCaptures(validCaptures);
     } catch (error) {
       console.error("Failed to load screenshots:", error);
       throw error;
