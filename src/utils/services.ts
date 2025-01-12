@@ -3,57 +3,17 @@ import {
   getFrontmostApplication,
   showToast as raycastShowToast,
   Toast,
-  getPreferenceValues,
   closeMainWindow,
   popToRoot,
 } from "@raycast/api";
 import { runAppleScript } from "@raycast/utils";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import * as os from "node:os";
 import { v4 as uuidv4 } from "uuid";
+import { CONFIG } from "./config";
+import type { BrowserApp, CaptureContext, CaptureInput, CapturedData, CaptureType } from "./types";
+import { handleError } from "./errors";
 
-interface Preferences {
-  screenshotsDirectory: string;
-  captureDirectory: string;
-}
-
-// Configuration
-export const CONFIG = {
-  directories: {
-    captures: getPreferenceValues<Preferences>().captureDirectory.replace("~", os.homedir()),
-    screenshots: getPreferenceValues<Preferences>().screenshotsDirectory.replace("~", os.homedir()),
-  },
-  supportedBrowsers: ["Arc", "Brave", "Chrome", "Safari", "Firefox", "Orion"] as const,
-} as const;
-
-export type BrowserApp = (typeof CONFIG.supportedBrowsers)[number];
-export type CaptureType = "screenshot" | "clipboard" | "selection";
-
-export interface CaptureInput {
-  selectedText?: string | null;
-  screenshotPath?: string | null;
-  activeViewContent?: string | null;
-}
-
-export interface CaptureContext {
-  app: string | null;
-  bundleId: string | null;
-  url: string | null;
-  window: string | null;
-}
-
-export interface CapturedData extends Required<CaptureContext> {
-  id: string;
-  type: CaptureType;
-  timestamp: string;
-  selectedText: string | null;
-  screenshotPath: string | null;
-  activeViewContent: string | null;
-  comment?: string;
-}
-
-// Services
 export const FileService = {
   async ensureDirectory(dir: string) {
     console.debug("Ensuring directory exists:", dir);
@@ -253,12 +213,7 @@ export const ToastService = {
   },
 
   async showError(error: unknown) {
-    console.error("Capture failed:", error);
-    return raycastShowToast({
-      style: Toast.Style.Failure,
-      title: "Capture Failed",
-      message: String(error),
-    });
+    await handleError(error, "Capture Failed");
   },
 };
 
@@ -311,7 +266,6 @@ export const CaptureService = {
       await closeMainWindow();
       await popToRoot();
     } catch (error) {
-      console.error("Capture failed:", error);
       await ToastService.showError(error);
     }
   },

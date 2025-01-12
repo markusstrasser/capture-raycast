@@ -4,6 +4,7 @@ import { FileService, CONFIG } from "../utils";
 import type { CapturedData } from "../utils";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
+import { v4 as uuidv4 } from "uuid";
 
 interface FormValues {
   comment: string;
@@ -21,41 +22,62 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
   async function handleSubmit(values: FormValues) {
     try {
       setIsSubmitting(true);
-      const updatedData = {
-        ...data,
-        comment: values.comment,
-      };
 
-      // Save comment to original metadata file
-      await FileService.saveJSON(filePath, updatedData);
+      // If this is a screenshot from the screenshots directory, copy it to captures
+      if (data.type === "screenshot" && data.screenshotPath?.startsWith("file://")) {
+        const sourcePath = data.screenshotPath.replace(/^file:\/\//, "");
+        console.debug("Source screenshot path:", sourcePath);
 
-      // If this is a screenshot (has a file path), copy it to capture directory
-      if (data.screenshotPath?.startsWith("file://")) {
-        const screenshotPath = data.screenshotPath.replace("file://", "");
-        const timestamp = new Date().toISOString().replace(/:/g, "-");
-        const newScreenshotName = `screenshot-${timestamp}.png`;
-        const newScreenshotPath = path.join(CONFIG.saveDir, newScreenshotName);
+        if (sourcePath.startsWith(CONFIG.directories.screenshots)) {
+          console.debug("Copying screenshot to captures directory");
 
-        // Copy screenshot file
-        await fs.copyFile(screenshotPath, newScreenshotPath);
+          // Generate new paths
+          const timestamp = new Date().toISOString().replace(/:/g, "-");
+          const newImagePath = path.join(CONFIG.directories.captures, `screenshot-${timestamp}.png`);
+          const newJsonPath = path.join(CONFIG.directories.captures, `screenshot-${timestamp}.json`);
 
-        // Create capture data
-        const captureData: CapturedData = {
-          id: data.id,
-          selectedText: null,
-          activeViewContent: null,
-          app: data.app,
-          bundleId: data.bundleId,
-          url: data.url,
-          window: data.window,
-          timestamp: new Date().toISOString(),
-          screenshotPath: newScreenshotPath,
+          // Ensure captures directory exists
+          await FileService.ensureDirectory(CONFIG.directories.captures);
+
+          // Copy the image
+          console.debug("Copying from:", sourcePath);
+          console.debug("Copying to:", newImagePath);
+          await fs.copyFile(sourcePath, newImagePath);
+          console.debug("Copied screenshot to:", newImagePath);
+
+          // Create new capture data
+          const captureData: CapturedData = {
+            id: uuidv4(),
+            type: "screenshot",
+            timestamp: new Date().toISOString(),
+            screenshotPath: `file://${newImagePath}`,
+            comment: values.comment,
+            selectedText: null,
+            activeViewContent: null,
+            app: data.app,
+            bundleId: data.bundleId,
+            url: data.url,
+            window: data.window,
+          };
+
+          // Save the JSON
+          await FileService.saveJSON(newJsonPath, captureData);
+          console.debug("Saved capture data to:", newJsonPath);
+        } else {
+          // For existing captures in the captures directory, just update the comment
+          const updatedData = {
+            ...data,
+            comment: values.comment,
+          };
+          await FileService.saveJSON(filePath, updatedData);
+        }
+      } else {
+        // For non-screenshot captures or those without a path, just update the comment
+        const updatedData = {
+          ...data,
           comment: values.comment,
         };
-
-        // Save capture data
-        const jsonPath = path.join(CONFIG.saveDir, `screenshot-capture-${timestamp}.json`);
-        await FileService.saveJSON(jsonPath, captureData);
+        await FileService.saveJSON(filePath, updatedData);
       }
 
       await showHUD("✓ Added comment");

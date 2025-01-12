@@ -1,20 +1,11 @@
-import { List, ActionPanel, Action, showToast, Toast } from "@raycast/api";
 import { useState, useEffect, useCallback } from "react";
 import { FileService, CONFIG, WindowService } from "./utils";
 import type { CapturedData } from "./utils";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import { watch } from "node:fs";
-import { CaptureDetail } from "./components/CaptureDetail";
-import { CommentForm } from "./components/CommentForm";
 import { v4 as uuidv4 } from "uuid";
-
-interface CaptureFile {
-  path: string;
-  metadataPath: string;
-  data: CapturedData;
-  timestamp: Date;
-}
+import { CaptureList, type CaptureFile } from "./components/CaptureList";
 
 export default function Command() {
   const [captures, setCaptures] = useState<CaptureFile[]>([]);
@@ -24,15 +15,15 @@ export default function Command() {
     setIsLoading(true);
     try {
       // Ensure screenshots directory exists
-      await FileService.ensureDirectory(CONFIG.screenshotsDir);
+      await FileService.ensureDirectory(CONFIG.directories.screenshots);
 
       // Ensure metadata directory exists
-      const metadataDir = path.join(CONFIG.screenshotsDir, ".metadata");
+      const metadataDir = path.join(CONFIG.directories.screenshots, ".metadata");
       await FileService.ensureDirectory(metadataDir);
 
       // Get all image files
-      const files = await fs.readdir(CONFIG.screenshotsDir);
-      console.log("All files in directory:", files);
+      const files = await fs.readdir(CONFIG.directories.screenshots);
+      console.debug("All files in directory:", files);
 
       // Filter out hidden files and directories, match any image extension
       const imageFiles = files.filter(
@@ -40,22 +31,22 @@ export default function Command() {
           !f.startsWith(".") && // Exclude hidden files/dirs
           /\.(png|gif|mp4|jpg|jpeg|webp|heic)$/i.test(f), // Match any common image format
       );
-      console.log("Filtered image files:", imageFiles);
+      console.debug("Filtered image files:", imageFiles);
 
       if (imageFiles.length === 0) {
-        console.log("No images found in", CONFIG.screenshotsDir);
+        console.debug("No images found in", CONFIG.directories.screenshots);
       }
 
       const captureFiles: CaptureFile[] = [];
       for (const file of imageFiles) {
-        console.log("Processing file:", file);
-        const filePath = path.join(CONFIG.screenshotsDir, file);
+        console.debug("Processing file:", file);
+        const filePath = path.join(CONFIG.directories.screenshots, file);
         const metadataPath = path.join(metadataDir, `${file}.json`);
 
         let stats: { size: number; mtime: Date; birthtime: Date };
         try {
           stats = await fs.stat(filePath);
-          console.log("File stats:", { size: stats.size, mtime: stats.mtime });
+          console.debug("File stats:", { size: stats.size, mtime: stats.mtime });
         } catch (error) {
           console.error("Failed to stat file:", file, error);
           continue;
@@ -67,17 +58,15 @@ export default function Command() {
           data = JSON.parse(content) as CapturedData;
         } catch {
           // If no metadata exists, create new metadata
-          const { appName, bundleId } = await WindowService.getActiveAppInfo();
+          const context = await WindowService.getActiveAppInfo();
           const timestamp = stats.birthtime.toISOString();
           data = {
             id: uuidv4(),
+            type: "screenshot",
             selectedText: null,
             activeViewContent: null,
-            app: appName,
-            bundleId: bundleId,
-            url: null,
-            window: appName,
-            timestamp: timestamp,
+            ...context,
+            timestamp,
             screenshotPath: `file://${filePath}`,
           };
           await FileService.saveJSON(metadataPath, data);
@@ -93,14 +82,11 @@ export default function Command() {
 
       // Sort by timestamp, newest first
       captureFiles.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      console.debug("Sorted captures:", captureFiles);
       setCaptures(captureFiles);
     } catch (error) {
       console.error("Failed to load screenshots:", error);
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to Load Screenshots",
-        message: `Make sure ${CONFIG.screenshotsDir} exists and is accessible`,
-      });
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -108,9 +94,9 @@ export default function Command() {
 
   // Watch for file changes in the screenshots directory
   useEffect(() => {
-    const watcher = watch(CONFIG.screenshotsDir, (eventType, filename) => {
+    const watcher = watch(CONFIG.directories.screenshots, (eventType, filename) => {
       if (filename && !filename.startsWith(".")) {
-        console.log("File change detected:", eventType, filename);
+        console.debug("File change detected:", eventType, filename);
         loadCaptures();
       }
     });
@@ -125,79 +111,14 @@ export default function Command() {
     loadCaptures();
   }, [loadCaptures]);
 
-  const preferenceActions = (
-    <>
-      <Action.OpenInBrowser
-        title="Change Screenshots Directory"
-        icon="🖼️"
-        url="raycast://preferences/extensions/capture?preferences=screenshotsDirectory"
-        shortcut={{ modifiers: ["cmd", "shift"], key: "s" }}
-        onOpen={loadCaptures}
-      />
-      <Action.OpenInBrowser
-        title="Change Capture Directory"
-        icon="📁"
-        url="raycast://preferences/extensions/capture?preferences=captureDirectory"
-        shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
-        onOpen={loadCaptures}
-      />
-      <Action
-        title="Refresh Screenshots"
-        icon="↻"
-        onAction={loadCaptures}
-        shortcut={{ modifiers: ["cmd"], key: "r" }}
-      />
-    </>
-  );
-
-  if (captures.length === 0 && !isLoading) {
-    return (
-      <List>
-        <List.EmptyView
-          title="No screenshots found"
-          description={`Make sure your screenshots are saved to ${CONFIG.screenshotsDir}`}
-          actions={<ActionPanel>{preferenceActions}</ActionPanel>}
-        />
-      </List>
-    );
-  }
-
   return (
-    <List isLoading={isLoading} searchBarPlaceholder="Search screenshots..." isShowingDetail>
-      {captures.map((capture) => {
-        const date = new Date(capture.data.timestamp);
-        const dateString = date.toLocaleDateString([], { month: "short", day: "numeric" });
-
-        return (
-          <List.Item
-            key={capture.path}
-            icon="🖼️"
-            title={path.basename(capture.path)}
-            subtitle={capture.data.comment?.slice(0, 50)}
-            accessories={[{ text: dateString }, ...(capture.data.comment ? [{ icon: "💭" }] : [])]}
-            detail={<CaptureDetail data={capture.data} />}
-            actions={
-              <ActionPanel>
-                <ActionPanel.Section>
-                  <Action.Push
-                    title="Add or Edit Comment"
-                    target={
-                      <CommentForm data={capture.data} filePath={capture.metadataPath} onCommentSaved={loadCaptures} />
-                    }
-                    shortcut={{ modifiers: ["cmd"], key: "e" }}
-                  />
-                  <Action.Open
-                    title="Open Screenshot"
-                    target={capture.path}
-                    shortcut={{ modifiers: ["cmd"], key: "o" }}
-                  />
-                </ActionPanel.Section>
-                <ActionPanel.Section>{preferenceActions}</ActionPanel.Section>
-              </ActionPanel>
-            }
-          />
-        );
-      })}
-    </List>
+    <CaptureList
+      captures={captures}
+      isLoading={isLoading}
+      onRefresh={loadCaptures}
+      onCommentSaved={loadCaptures}
+      emptyTitle="No screenshots found"
+      emptyDescription={`Make sure your screenshots are saved to ${CONFIG.directories.screenshots}`}
+    />
   );
 }
