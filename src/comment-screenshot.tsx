@@ -39,7 +39,7 @@ export default function Command() {
 
       const validCaptures = fileStats
         .filter((s): s is NonNullable<typeof s> => s !== null)
-        .map(({ file, path: filePath, stats }) => ({
+        .map(({ path: filePath, stats }) => ({
           path: filePath,
           data: {
             id: path.basename(filePath),

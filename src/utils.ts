@@ -1,4 +1,3 @@
-import winston from "winston";
 import {
   BrowserExtension,
   getFrontmostApplication,
@@ -6,7 +5,6 @@ import {
   Toast,
   getPreferenceValues,
   closeMainWindow,
-  popToRoot,
 } from "@raycast/api";
 import { runAppleScript } from "@raycast/utils";
 import * as fs from "node:fs/promises";
