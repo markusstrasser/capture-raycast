@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { files, CONFIG, data as dataUtils, paths } from "./utils";
-import type { CapturedData } from "./utils";
+import { utils, CONFIG } from "./utils";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import { watch } from "node:fs";
@@ -24,12 +23,12 @@ export default function Command() {
   const loadCaptures = useCallback(async () => {
     setIsLoading(true);
     try {
-      await files.ensureDirectory(CONFIG.directories.screenshots);
+      await utils.ensureDirectory(CONFIG.directories.screenshots);
 
       const allFiles = await fs.readdir(CONFIG.directories.screenshots);
       console.debug("All files in directory:", allFiles);
 
-      const imageFiles = allFiles.filter(paths.isImageFile);
+      const imageFiles = allFiles.filter(utils.isImageFile);
       console.debug("Filtered image files:", imageFiles);
 
       if (imageFiles.length === 0) {
@@ -42,19 +41,19 @@ export default function Command() {
         .filter((s): s is NonNullable<typeof s> => s !== null)
         .map(({ file, path: filePath, stats }) => ({
           path: filePath,
-          data: dataUtils.createCaptureData(
-            "screenshot",
-            {
-              app: "Screenshot",
-              bundleId: null,
-              url: null,
-              window: null,
-            },
-            {
-              timestamp: stats.mtime.toISOString(),
-              screenshotPath: paths.getFileUrl(filePath),
-            },
-          ),
+          data: {
+            id: path.basename(filePath),
+            type: "screenshot" as const,
+            timestamp: stats.mtime.toISOString(),
+            selectedText: null,
+            screenshotPath: utils.getFileUrl(filePath),
+            activeViewContent: null,
+            app: "Screenshot",
+            bundleId: null,
+            url: null,
+            window: null,
+            title: null,
+          },
           timestamp: stats.mtime,
         }))
         .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());

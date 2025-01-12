@@ -1,9 +1,9 @@
-import { Form, ActionPanel, Action, showHUD, popToRoot, showToast, Toast } from "@raycast/api";
+import { Form, ActionPanel, Action, showHUD, popToRoot, Toast } from "@raycast/api";
 import { useState } from "react";
-import { files, CONFIG, data as dataUtils, paths } from "../utils";
+import { utils, CONFIG } from "../utils";
 import type { CapturedData } from "../utils";
 import * as fs from "node:fs/promises";
-import { v4 as uuidv4 } from "uuid";
+import * as path from "node:path";
 
 interface FormValues {
   comment: string;
@@ -17,55 +17,49 @@ interface CommentFormProps {
 
 const handleScreenshotComment = async (data: CapturedData, sourcePath: string, comment: string) => {
   const timestamp = new Date().toISOString();
-  const capturePaths = paths.createCapturePaths("screenshot", timestamp);
+  const imagePath = path.join(CONFIG.directories.captures, `screenshot-${utils.sanitizeTimestamp(timestamp)}.png`);
+  const jsonPath = path.join(CONFIG.directories.captures, `screenshot-${utils.sanitizeTimestamp(timestamp)}.json`);
 
-  await files.ensureDirectory(CONFIG.directories.captures);
-  await fs.copyFile(sourcePath, capturePaths.image);
+  await utils.ensureDirectory(CONFIG.directories.captures);
+  await fs.copyFile(sourcePath, imagePath);
 
-  const captureData = dataUtils.createCaptureData(data.type, data, {
+  const captureData: CapturedData = {
+    ...data,
+    id: path.basename(jsonPath, ".json"),
     timestamp,
-    screenshotPath: capturePaths.getUrl(capturePaths.image),
+    screenshotPath: utils.getFileUrl(imagePath),
     comment,
-  });
+  };
 
-  await files.saveJSON(capturePaths.json, captureData);
-  return capturePaths.json;
+  await utils.saveJSON(jsonPath, captureData);
+  return jsonPath;
 };
 
 export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(values: FormValues) {
+    if (!values.comment?.trim()) return;
+
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-
-      if (data.screenshotPath) {
-        const sourcePath = paths.stripFileProtocol(data.screenshotPath);
-
-        if (dataUtils.shouldCopyScreenshot(data, sourcePath)) {
-          console.debug("Copying screenshot to captures directory");
-          await handleScreenshotComment(data, sourcePath, values.comment);
-        } else {
-          const updatedData = {
-            ...data,
-            comment: values.comment,
-          };
-          await files.saveJSON(filePath, updatedData);
+      if (data.type === "screenshot" && filePath.startsWith(CONFIG.directories.screenshots)) {
+        const screenshotPath = data.screenshotPath;
+        if (!screenshotPath) {
+          throw new Error("Screenshot path is missing");
         }
+        await handleScreenshotComment(data, utils.stripFileProtocol(screenshotPath), values.comment);
       } else {
-        const updatedData = {
-          ...data,
-          comment: values.comment,
-        };
-        await files.saveJSON(filePath, updatedData);
+        const updatedData = { ...data, comment: values.comment };
+        await utils.saveJSON(filePath, updatedData);
       }
 
-      await showHUD("✓ Added comment");
-      onCommentSaved?.();
+      await showHUD("Comment saved");
       await popToRoot();
+      onCommentSaved?.();
     } catch (error) {
       console.error("Failed to save comment:", error);
-      await showToast({
+      await utils.showToast({
         style: Toast.Style.Failure,
         title: "Failed to Save Comment",
         message: String(error),
@@ -87,13 +81,9 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
       <Form.TextArea
         id="comment"
         title="Comment"
-        placeholder="Add any notes about this capture..."
+        placeholder="Add your comment here..."
         defaultValue={data.comment}
         enableMarkdown
-      />
-      <Form.Description
-        title="Capture Info"
-        text={`${data.app || "Unknown"} - ${new Date(data.timestamp).toLocaleString()}`}
       />
     </Form>
   );

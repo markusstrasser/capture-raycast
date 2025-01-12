@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { CapturedData } from "../utils";
-import { files } from "../utils";
+import { utils } from "../utils";
 
 interface CaptureFile {
   path: string;
@@ -15,7 +15,7 @@ export function useCaptureList(directory: string) {
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
-      const captures = await files.loadCaptures(directory);
+      const captures = await utils.loadCaptures(directory);
       setItems(captures);
     } catch (error) {
       console.error("Failed to load captures:", error);

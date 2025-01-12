@@ -3,7 +3,7 @@ import type { CapturedData } from "../utils";
 import * as path from "node:path";
 import { PreferenceActions } from "./PreferenceActions";
 import { CommentForm } from "./CommentForm";
-import { data as dataUtils } from "../utils";
+import { utils } from "../utils";
 import { getFavicon } from "@raycast/utils";
 
 export interface CaptureFile {
@@ -65,13 +65,14 @@ export function CaptureList({
         ? path.basename(capture.path)
         : `${timeString} - ${capture.data.app || "Unknown"}`;
 
-    const metadata = dataUtils.getCaptureMetadata(capture.data);
+    const metadata = utils.getCaptureMetadata(capture.data);
     const markdown = capture.data.screenshotPath
       ? `![Screenshot](${capture.data.screenshotPath.replace(/^file:\/\//, "")})`
       : undefined;
 
     return (
       <List.Item
+        key={capture.data.id}
         icon={icon}
         title={title}
         subtitle={capture.data.url || undefined}

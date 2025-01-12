@@ -18,18 +18,12 @@ import { v4 as uuidv4 } from "uuid";
 export type CaptureType = "screenshot" | "clipboard" | "selection";
 export type BrowserApp = (typeof CONFIG.supportedBrowsers)[number];
 
-export interface CaptureInput {
-  selectedText?: string | null;
-  screenshotPath?: string | null;
-  activeViewContent?: string | null;
-}
-
 export interface CaptureContext {
   app: string | null;
   bundleId: string | null;
   url: string | null;
   window: string | null;
-  title?: string | null;
+  title: string | null;
 }
 
 export interface CapturedData extends Required<Omit<CaptureContext, "title">> {
@@ -43,72 +37,10 @@ export interface CapturedData extends Required<Omit<CaptureContext, "title">> {
   title: string | null;
 }
 
-// Pure functions
-export const paths = {
-  sanitizeTimestamp: (timestamp: string) => timestamp.replace(/:/g, "-"),
-
-  createCapturePaths: (type: string, timestamp = new Date().toISOString()) => {
-    const sanitized = paths.sanitizeTimestamp(timestamp);
-    return {
-      image: path.join(CONFIG.directories.captures, `${type}-${sanitized}.png`),
-      json: path.join(CONFIG.directories.captures, `${type}-${sanitized}.json`),
-      getUrl: (p: string) => `file://${p}`,
-    };
-  },
-
-  isImageFile: (f: string) => !f.startsWith(".") && /\.(png|gif|mp4|jpg|jpeg|webp|heic)$/i.test(f),
-
-  getFileUrl: (filePath: string) => `file://${filePath}`,
-  stripFileProtocol: (url: string) => url.replace(/^file:\/\//, ""),
-};
-
-export const data = {
-  createCaptureData: (
-    type: CaptureType,
-    base: Partial<CaptureContext>,
-    options: {
-      timestamp?: string;
-      screenshotPath?: string | null;
-      comment?: string;
-      selectedText?: string | null;
-      activeViewContent?: string | null;
-    } = {},
-  ): CapturedData => ({
-    id: uuidv4(),
-    type,
-    timestamp: options.timestamp ?? new Date().toISOString(),
-    screenshotPath: options.screenshotPath ?? null,
-    selectedText: options.selectedText ?? null,
-    activeViewContent: options.activeViewContent ?? null,
-    comment: options.comment ?? undefined,
-    app: base.app ?? null,
-    bundleId: base.bundleId ?? null,
-    url: base.url ?? null,
-    window: base.window ?? null,
-    title: base.title ?? null,
-  }),
-
-  getCaptureMetadata: (capture: CapturedData) => {
-    const base = [
-      { label: "Type", value: capture.type },
-      { label: "Timestamp", value: new Date(capture.timestamp).toLocaleString() },
-      { label: "App", value: capture.app },
-      { label: "Bundle ID", value: capture.bundleId },
-      { label: "Window", value: capture.window },
-    ];
-
-    return [
-      ...base.filter((item): item is { label: string; value: string } => Boolean(item.value)),
-      ...(capture.selectedText?.trim() ? [{ label: "Selected Text", value: capture.selectedText.trim() }] : []),
-      ...(capture.comment ? [{ label: "Comment", value: capture.comment }] : []),
-    ];
-  },
-
-  shouldCopyScreenshot: (data: CapturedData, sourcePath: string) =>
-    data.type === "screenshot" &&
-    data.screenshotPath?.startsWith("file://") &&
-    sourcePath.startsWith(CONFIG.directories.screenshots),
-};
+interface TabInfo {
+  url: string | null;
+  title: string | null;
+}
 
 // Configuration
 export const CONFIG = {
@@ -122,38 +54,29 @@ export const CONFIG = {
   supportedBrowsers: ["Arc", "Brave", "Chrome", "Safari", "Firefox", "Orion"] as const,
 } as const;
 
-// Logger setup
-const logger = winston.createLogger({
-  level: "debug",
-  format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
-  transports: [new winston.transports.Console({ format: winston.format.simple() })],
-});
-
-// File operations
-export const files = {
-  ensureDirectory: async (dir: string): Promise<void> => {
-    logger.debug("Ensuring directory exists:", { dir });
+// Core utilities
+export const utils = {
+  async ensureDirectory(dir: string): Promise<void> {
     try {
       await fs.mkdir(dir, { recursive: true });
     } catch (error) {
-      logger.error("Failed to create directory:", { dir, error });
+      console.error("Failed to create directory:", { dir, error });
       throw error;
     }
   },
 
-  getTimestampedPath: (base: string, name: string, ext: string): string => {
+  getTimestampedPath(base: string, name: string, ext: string): string {
     const timestamp = new Date().toISOString().replace(/:/g, "-");
     return path.join(base, `${name}-${timestamp}.${ext}`);
   },
 
-  saveJSON: async (filePath: string, data: unknown): Promise<void> => {
-    logger.debug("Saving JSON", { filePath });
-    await files.ensureDirectory(path.dirname(filePath));
+  async saveJSON(filePath: string, data: unknown): Promise<void> {
+    await utils.ensureDirectory(path.dirname(filePath));
     await fs.writeFile(filePath, JSON.stringify(data, null, 2));
   },
 
-  loadCaptures: async (directory: string) => {
-    await files.ensureDirectory(directory);
+  async loadCaptures(directory: string) {
+    await utils.ensureDirectory(directory);
     const allFiles = await fs.readdir(directory);
     const jsonFiles = allFiles.filter((f) => f.endsWith(".json"));
 
@@ -166,7 +89,7 @@ export const files = {
             ? { path: filePath, data, timestamp: new Date(data.timestamp) }
             : null;
         } catch (error) {
-          logger.error("Failed to load capture:", { filePath, error });
+          console.error("Failed to load capture:", { filePath, error });
           return null;
         }
       }),
@@ -176,15 +99,19 @@ export const files = {
       .filter((c): c is NonNullable<typeof c> => c !== null)
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   },
-};
 
-// Browser operations
-export const browser = {
+  isImageFile: (f: string) => !f.startsWith(".") && /\.(png|gif|mp4|jpg|jpeg|webp|heic)$/i.test(f),
+
+  getFileUrl: (filePath: string) => `file://${filePath}`,
+  stripFileProtocol: (url: string) => url.replace(/^file:\/\//, ""),
+
+  sanitizeTimestamp: (timestamp: string) => timestamp.replace(/:/g, "-"),
+
   isSupportedBrowser: (appName: string | null): appName is BrowserApp =>
     Boolean(appName && CONFIG.supportedBrowsers.includes(appName as BrowserApp)),
 
-  getActiveTabInfo: async (appName: string | null) => {
-    if (!browser.isSupportedBrowser(appName)) {
+  async getActiveTabInfo(appName: string | null): Promise<TabInfo> {
+    if (!utils.isSupportedBrowser(appName)) {
       return { url: null, title: null };
     }
 
@@ -204,7 +131,7 @@ export const browser = {
             };
           }
         } catch (error) {
-          logger.debug("Failed to get current window title:", { error });
+          console.debug("Failed to get current window title:", { error });
         }
       }
 
@@ -214,45 +141,22 @@ export const browser = {
         title: activeTab?.title ?? null,
       };
     } catch (error) {
-      logger.debug("Failed to get tab info:", { browser: appName, error });
+      console.debug("Failed to get tab info:", { browser: appName, error });
       return { url: null, title: null };
     }
   },
 
-  getActiveTabHTML: async (appName: string | null): Promise<string | null> => {
-    if (!browser.isSupportedBrowser(appName)) return null;
+  async getActiveTabContent(appName: string | null): Promise<string | null> {
+    if (!utils.isSupportedBrowser(appName)) return null;
     try {
       return await BrowserExtension.getContent({ format: "markdown" });
-    } catch {
-      return null;
-    }
-  },
-};
-
-// Screenshot operations
-export const screenshot = {
-  capture: async (saveDir: string, timestamp: string): Promise<string | null> => {
-    try {
-      await files.ensureDirectory(saveDir);
-      const outputPath = path.join(saveDir, `screenshot-${timestamp}.png`);
-      await runAppleScript(`do shell script "screencapture -x '${outputPath}'"`);
-
-      try {
-        await fs.access(outputPath);
-        return outputPath;
-      } catch {
-        return null;
-      }
     } catch (error) {
-      logger.error("Screenshot capture failed:", { error });
+      console.debug("Failed to get tab content:", { browser: appName, error });
       return null;
     }
   },
-};
 
-// Window operations
-export const window = {
-  getActiveInfo: async (): Promise<CaptureContext> => {
+  async getActiveWindowInfo(): Promise<CaptureContext> {
     const script = `
       tell application "System Events"
         set frontAppProcess to first application process whose frontmost is true
@@ -264,85 +168,105 @@ export const window = {
     const result = await runAppleScript(script);
     const [appName, bundleId] = result.trim().split("|||");
     const frontMostApp = await getFrontmostApplication();
-    const tabInfo = await browser.getActiveTabInfo(appName);
+    const tabInfo = await utils.getActiveTabInfo(appName);
 
     return {
       app: appName,
       bundleId,
       url: tabInfo.url,
       window: frontMostApp.name,
-      title: tabInfo.title ?? null,
+      title: tabInfo.title,
     };
   },
-};
 
-// Toast operations
-export const toast = {
-  capturing: () => raycastShowToast({ style: Toast.Style.Animated, title: "Capturing context..." }),
-  success: (message?: string) =>
-    raycastShowToast({
-      style: Toast.Style.Success,
-      title: "Context Captured",
-      message: message ?? "⌘K to add a comment",
-    }),
-  error: (error: unknown) => {
-    logger.error("Capture failed:", { error });
-    return raycastShowToast({
-      style: Toast.Style.Failure,
-      title: "Capture Failed",
-      message: String(error),
-    });
+  async captureScreenshot(saveDir: string, timestamp: string): Promise<string | null> {
+    try {
+      await utils.ensureDirectory(saveDir);
+      const outputPath = path.join(saveDir, `screenshot-${timestamp}.png`);
+      await runAppleScript(`do shell script "screencapture -x '${outputPath}'"`);
+
+      try {
+        await fs.access(outputPath);
+        return outputPath;
+      } catch {
+        return null;
+      }
+    } catch (error) {
+      console.error("Screenshot capture failed:", { error });
+      return null;
+    }
+  },
+
+  getCaptureMetadata(capture: CapturedData): Array<{ label: string; value: string }> {
+    const base = [
+      { label: "Type", value: capture.type },
+      { label: "Timestamp", value: new Date(capture.timestamp).toLocaleString() },
+      { label: "App", value: capture.app },
+      { label: "Bundle ID", value: capture.bundleId },
+      { label: "Window", value: capture.window },
+    ];
+
+    return [
+      ...base.filter((item): item is { label: string; value: string } => Boolean(item.value)),
+      ...(capture.selectedText?.trim() ? [{ label: "Selected Text", value: capture.selectedText.trim() }] : []),
+      ...(capture.comment ? [{ label: "Comment", value: capture.comment }] : []),
+    ];
+  },
+
+  async showToast(options: { style: Toast.Style; title: string; message?: string }): Promise<Toast> {
+    return raycastShowToast(options);
   },
 };
 
-// Capture operations
-export const capture = {
-  create: async (type: CaptureType, getData: () => Promise<CaptureInput>) => {
-    const timestamp = new Date().toISOString();
-    const data = await getData();
-    const context = await window.getActiveInfo();
-    const browserContent = browser.isSupportedBrowser(context.app) ? await browser.getActiveTabHTML(context.app) : null;
+// Simplified capture function
+export async function createCapture(
+  type: CaptureType,
+  getData: () => Promise<{ selectedText?: string | null; screenshotPath?: string | null }>,
+  validate?: (data: { selectedText?: string | null; screenshotPath?: string | null }) => boolean | string,
+) {
+  try {
+    await utils.showToast({ style: Toast.Style.Animated, title: "Capturing context..." });
 
-    return {
+    const data = await getData();
+    console.debug("Raw capture data:", { data });
+
+    if (validate) {
+      const validationResult = validate(data);
+      if (validationResult !== true) {
+        throw new Error(typeof validationResult === "string" ? validationResult : "Validation failed");
+      }
+    }
+
+    const timestamp = new Date().toISOString();
+    const context = await utils.getActiveWindowInfo();
+    const browserContent = utils.isSupportedBrowser(context.app) ? await utils.getActiveTabContent(context.app) : null;
+
+    const captureData: CapturedData = {
       id: uuidv4(),
       type,
       timestamp,
       selectedText: data.selectedText ?? null,
       screenshotPath: data.screenshotPath ?? null,
-      activeViewContent: data.activeViewContent ?? browserContent,
+      activeViewContent: browserContent,
       ...context,
-      favicon: context.favicon ?? null,
       title: context.title ?? null,
     };
-  },
 
-  save: async (
-    type: CaptureType,
-    getData: () => Promise<CaptureInput>,
-    validate?: (data: CaptureInput) => boolean | string,
-  ) => {
-    try {
-      await toast.capturing();
+    const filePath = utils.getTimestampedPath(CONFIG.directories.captures, type, "json");
+    await utils.saveJSON(filePath, captureData);
 
-      const data = await getData();
-      logger.debug("Raw capture data:", { data });
+    await utils.showToast({ style: Toast.Style.Success, title: "Context Captured", message: "⌘K to add a comment" });
+    await closeMainWindow();
+    await popToRoot();
 
-      if (validate) {
-        const validationResult = validate(data);
-        if (validationResult !== true) {
-          throw new Error(typeof validationResult === "string" ? validationResult : "Validation failed");
-        }
-      }
-
-      const captureData = await capture.create(type, async () => data);
-      const filePath = files.getTimestampedPath(CONFIG.directories.captures, type, "json");
-      await files.saveJSON(filePath, captureData);
-
-      await toast.success();
-      await closeMainWindow();
-      await popToRoot();
-    } catch (error) {
-      await toast.error(error);
-    }
-  },
-};
+    return captureData;
+  } catch (error) {
+    console.error("Capture failed:", { error });
+    await utils.showToast({
+      style: Toast.Style.Failure,
+      title: "Capture Failed",
+      message: String(error),
+    });
+    throw error;
+  }
+}
