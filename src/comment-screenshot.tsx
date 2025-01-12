@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { FileService, CONFIG } from "./utils";
+import { files, CONFIG } from "./utils";
 import type { CapturedData } from "./utils";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
@@ -14,14 +14,14 @@ export default function Command() {
     setIsLoading(true);
     try {
       // Ensure screenshots directory exists
-      await FileService.ensureDirectory(CONFIG.directories.screenshots);
+      await files.ensureDirectory(CONFIG.directories.screenshots);
 
       // Get all image files
-      const files = await fs.readdir(CONFIG.directories.screenshots);
-      console.debug("All files in directory:", files);
+      const allFiles = await fs.readdir(CONFIG.directories.screenshots);
+      console.debug("All files in directory:", allFiles);
 
       // Filter out hidden files and directories, match any image extension
-      const imageFiles = files.filter(
+      const imageFiles = allFiles.filter(
         (f) =>
           !f.startsWith(".") && // Exclude hidden files/dirs
           /\.(png|gif|mp4|jpg|jpeg|webp|heic)$/i.test(f), // Match any common image format
@@ -52,7 +52,9 @@ export default function Command() {
                 bundleId: null,
                 url: null,
                 window: null,
-              },
+                favicon: null,
+                title: null,
+              } as CapturedData,
               timestamp: stats.mtime,
             };
           } catch (error) {

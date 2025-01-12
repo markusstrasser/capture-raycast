@@ -1,6 +1,6 @@
 import { Form, ActionPanel, Action, showHUD, popToRoot, showToast, Toast } from "@raycast/api";
 import { useState } from "react";
-import { FileService, CONFIG } from "../utils";
+import { files, CONFIG } from "../utils";
 import type { CapturedData } from "../utils";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
@@ -37,7 +37,7 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
           const newJsonPath = path.join(CONFIG.directories.captures, `screenshot-${timestamp}.json`);
 
           // Ensure captures directory exists
-          await FileService.ensureDirectory(CONFIG.directories.captures);
+          await files.ensureDirectory(CONFIG.directories.captures);
 
           // Copy the image
           console.debug("Copying from:", sourcePath);
@@ -58,10 +58,12 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
             bundleId: data.bundleId,
             url: data.url,
             window: data.window,
+            favicon: data.favicon,
+            title: data.title,
           };
 
           // Save the JSON
-          await FileService.saveJSON(newJsonPath, captureData);
+          await files.saveJSON(newJsonPath, captureData);
           console.debug("Saved capture data to:", newJsonPath);
         } else {
           // For existing captures in the captures directory, just update the comment
@@ -69,7 +71,7 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
             ...data,
             comment: values.comment,
           };
-          await FileService.saveJSON(filePath, updatedData);
+          await files.saveJSON(filePath, updatedData);
         }
       } else {
         // For non-screenshot captures or those without a path, just update the comment
@@ -77,7 +79,7 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
           ...data,
           comment: values.comment,
         };
-        await FileService.saveJSON(filePath, updatedData);
+        await files.saveJSON(filePath, updatedData);
       }
 
       await showHUD("✓ Added comment");
