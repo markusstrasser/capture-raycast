@@ -16,16 +16,17 @@ export function CaptureListItem({ capture, onCommentSaved, onRefresh }: CaptureL
   const timeString = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const dateString = date.toLocaleDateString([], { month: "short", day: "numeric" });
 
-  const icon = capture.data.activeViewContent ? "🌐" : "🗒️";
-  const title = path.basename(capture.path).startsWith("screenshot-")
-    ? path.basename(capture.path)
-    : `${timeString} - ${capture.data.app || "Unknown"}`;
+  const icon = capture.data.favicon || (capture.data.activeViewContent ? "🌐" : "🗒️");
+  const title =
+    capture.data.title || path.basename(capture.path).startsWith("screenshot-")
+      ? path.basename(capture.path)
+      : `${timeString} - ${capture.data.app || "Unknown"}`;
 
   return (
     <List.Item
       icon={icon}
       title={title}
-      subtitle={capture.data.selectedText?.slice(0, 50)}
+      subtitle={capture.data.url || undefined}
       accessories={[{ text: dateString }, ...(capture.data.comment ? [{ icon: "💭" }] : [])]}
       detail={<CaptureDetail data={capture.data} />}
       actions={

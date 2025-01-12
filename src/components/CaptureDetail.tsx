@@ -7,26 +7,29 @@ interface CaptureDetailProps {
 
 export function CaptureDetail({ data }: CaptureDetailProps) {
   const metadata = [
+    { label: "Type", value: data.type },
+    { label: "Timestamp", value: new Date(data.timestamp).toLocaleString() },
     { label: "App", value: data.app },
     { label: "Bundle ID", value: data.bundleId },
     { label: "Window", value: data.window },
-    { label: "Title", value: data.title },
-    { label: "URL", value: data.url },
-    { label: "Timestamp", value: new Date(data.timestamp).toLocaleString() },
-    { label: "Comment", value: data.comment },
   ].filter((item): item is { label: string; value: string } => Boolean(item.value));
 
-  const markdown = [
-    data.favicon && `![Favicon](${data.favicon})`,
-    data.selectedText && `**Selected Text**\n${data.selectedText}`,
-    data.screenshotPath && `![Screenshot](${data.screenshotPath.replace(/^file:\/\//, "")})`,
-    data.activeViewContent && `**Page Content**\n${data.activeViewContent}`,
-  ]
+  const selectedText = data.selectedText?.trim();
+  if (selectedText) {
+    metadata.push({ label: "Selected Text", value: selectedText });
+  }
+
+  if (data.comment) {
+    metadata.push({ label: "Comment", value: data.comment });
+  }
+
+  const markdown = [data.screenshotPath && `![Screenshot](${data.screenshotPath.replace(/^file:\/\//, "")})`]
     .filter(Boolean)
     .join("\n\n");
 
   return (
     <List.Item.Detail
+      markdown={markdown || undefined}
       metadata={
         <List.Item.Detail.Metadata>
           {metadata.map((item) => (
@@ -34,7 +37,6 @@ export function CaptureDetail({ data }: CaptureDetailProps) {
           ))}
         </List.Item.Detail.Metadata>
       }
-      markdown={markdown || undefined}
     />
   );
 }
