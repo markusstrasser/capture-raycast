@@ -16,8 +16,8 @@ export default async function Command() {
       }
 
       return {
-        text: selectedText,
-        screenshot: screenshotPath,
+        selectedText,
+        screenshotPath: screenshotPath,
       };
     },
   });

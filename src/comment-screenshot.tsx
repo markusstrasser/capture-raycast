@@ -7,6 +7,7 @@ import * as fs from "node:fs/promises";
 import { watch } from "node:fs";
 import { CaptureDetail } from "./components/CaptureDetail";
 import { CommentForm } from "./components/CommentForm";
+import { v4 as uuidv4 } from "uuid";
 
 interface CaptureFile {
   path: string;
@@ -63,49 +64,21 @@ export default function Command() {
         let data: CapturedData;
         try {
           const content = await fs.readFile(metadataPath, "utf-8");
-          const parsedData = JSON.parse(content);
-
-          // Handle legacy data format
-          if (!parsedData.metadata) {
-            data = {
-              content: {
-                text: parsedData.clipboardText || null,
-                html: parsedData.browserTabHTML || null,
-                screenshot: parsedData.screenshotPath || `file://${filePath}`,
-              },
-              source: {
-                app: parsedData.activeAppName || null,
-                bundleId: parsedData.activeAppBundleId || null,
-                url: parsedData.activeURL || null,
-                window: parsedData.frontAppName || null,
-              },
-              metadata: {
-                timestamp: parsedData.timestamp || stats.birthtime.toISOString(),
-                comment: parsedData.comment,
-              },
-            };
-          } else {
-            data = parsedData;
-          }
+          data = JSON.parse(content) as CapturedData;
         } catch {
           // If no metadata exists, create new metadata
           const { appName, bundleId } = await WindowService.getActiveAppInfo();
           const timestamp = stats.birthtime.toISOString();
           data = {
-            content: {
-              text: null,
-              html: null,
-              screenshot: `file://${filePath}`,
-            },
-            source: {
-              app: appName,
-              bundleId: bundleId,
-              url: null,
-              window: appName,
-            },
-            metadata: {
-              timestamp: timestamp,
-            },
+            id: uuidv4(),
+            selectedText: null,
+            activeViewContent: null,
+            app: appName,
+            bundleId: bundleId,
+            url: null,
+            window: appName,
+            timestamp: timestamp,
+            screenshotPath: `file://${filePath}`,
           };
           await FileService.saveJSON(metadataPath, data);
         }
@@ -114,7 +87,7 @@ export default function Command() {
           path: filePath,
           metadataPath,
           data,
-          timestamp: new Date(data.metadata.timestamp),
+          timestamp: new Date(data.timestamp),
         });
       }
 
@@ -192,7 +165,7 @@ export default function Command() {
   return (
     <List isLoading={isLoading} searchBarPlaceholder="Search screenshots..." isShowingDetail>
       {captures.map((capture) => {
-        const date = new Date(capture.data.metadata.timestamp);
+        const date = new Date(capture.data.timestamp);
         const dateString = date.toLocaleDateString([], { month: "short", day: "numeric" });
 
         return (
@@ -200,8 +173,8 @@ export default function Command() {
             key={capture.path}
             icon="🖼️"
             title={path.basename(capture.path)}
-            subtitle={capture.data.metadata.comment?.slice(0, 50)}
-            accessories={[{ text: dateString }, ...(capture.data.metadata.comment ? [{ icon: "💭" }] : [])]}
+            subtitle={capture.data.comment?.slice(0, 50)}
+            accessories={[{ text: dateString }, ...(capture.data.comment ? [{ icon: "💭" }] : [])]}
             detail={<CaptureDetail data={capture.data} />}
             actions={
               <ActionPanel>

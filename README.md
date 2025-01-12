@@ -68,3 +68,11 @@ If I then want to add a comment to the capture I can use the `Comment Captures` 
 
 - Make sure to double check your directories are correct and rerun the manage directories command.
 - For extra metadata browser captures (url, markdown) you need to have the raycast browser extension installed.
+
+
+
+## TODO
+
+* Reference (automatic) screenshot path in associated **JSON**
+  * Name captures with ID
+* Copy (user) screenshot to captureDir iff commented on

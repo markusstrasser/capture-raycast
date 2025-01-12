@@ -11,6 +11,7 @@ import { runAppleScript } from "@raycast/utils";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
+import { v4 as uuidv4 } from "uuid";
 
 interface Preferences {
   screenshotsDirectory: string;
@@ -28,26 +29,16 @@ export type BrowserApp = (typeof CONFIG.browserApps)[number];
 
 // Types
 export interface CapturedData {
-  // Content
-  content: {
-    text: string | null;
-    html: string | null;
-    screenshot: string | null;
-  };
-
-  // Source info
-  source: {
-    app: string | null;
-    bundleId: string | null;
-    url: string | null;
-    window: string | null;
-  };
-
-  // Metadata
-  metadata: {
-    timestamp: string;
-    comment?: string;
-  };
+  id: string;
+  selectedText: string | null;
+  activeViewContent: string | null;
+  app: string | null;
+  bundleId: string | null;
+  url: string | null;
+  window: string | null;
+  timestamp: string;
+  screenshotPath: string | null;
+  comment?: string;
 }
 
 // Services
@@ -68,13 +59,16 @@ export const FileService = {
   async captureScreenshot(saveDir: string, timestamp: string): Promise<string | null> {
     try {
       const outputPath = path.join(saveDir, `screenshot-${timestamp}.png`);
+      console.debug("Capturing screenshot to:", outputPath);
       const script = `do shell script "screencapture -x '${outputPath}'"`;
       await runAppleScript(script);
 
       try {
         await fs.access(outputPath);
+        console.debug("Screenshot saved successfully");
         return outputPath;
       } catch {
+        console.debug("Screenshot file not found after capture");
         return null;
       }
     } catch (error) {
@@ -207,26 +201,26 @@ export const CaptureService = {
     timestamp?: string;
   }): Promise<CapturedData> {
     const context = await this.gatherContext();
+    console.debug("Gathered context:", context);
+
+    // Ensure timestamp is a valid ISO string
+    const validTimestamp = new Date(timestamp).toISOString();
 
     return {
-      content: {
-        text,
-        html: html ?? context.browserTabHTML,
-        screenshot,
-      },
-      source: {
-        app: context.appName,
-        bundleId: context.bundleId,
-        url: context.activeURL,
-        window: context.frontAppName,
-      },
-      metadata: {
-        timestamp,
-      },
+      id: uuidv4(),
+      selectedText: text,
+      activeViewContent: html ?? context.browserTabHTML,
+      app: context.appName,
+      bundleId: context.bundleId,
+      url: context.activeURL,
+      window: context.frontAppName,
+      timestamp: validTimestamp,
+      screenshotPath: screenshot,
+      comment: undefined,
     };
   },
 
-  async capture<T>({
+  async capture<T extends { selectedText?: string | null; screenshotPath?: string | null }>({
     type,
     getData,
     validate,
@@ -240,6 +234,7 @@ export const CaptureService = {
 
       // Get data
       const data = await getData();
+      console.debug("Raw capture data:", data);
 
       // Validate if needed
       if (validate) {
@@ -254,19 +249,25 @@ export const CaptureService = {
 
       // Create capture data
       const timestamp = new Date().toISOString();
+      console.debug("Using timestamp:", timestamp);
+
       const captureData = await this.createCaptureData({
-        ...(typeof data === "string" ? { text: data } : data),
+        text: data.selectedText,
+        screenshot: data.screenshotPath,
         timestamp,
       });
+      console.debug("Created capture data:", JSON.stringify(captureData, null, 2));
 
       // Save to file
       const jsonPath = FileService.getTimestampedPath(CONFIG.saveDir, `${type}-capture`, "json");
+      console.debug("Saving to path:", jsonPath);
       await FileService.saveJSON(jsonPath, captureData);
 
       await ToastService.showSuccess();
       await closeMainWindow();
       await popToRoot();
     } catch (error) {
+      console.error("Capture failed:", error);
       await ToastService.showError(error);
     }
   },

@@ -23,18 +23,15 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
       setIsSubmitting(true);
       const updatedData = {
         ...data,
-        metadata: {
-          ...data.metadata,
-          comment: values.comment,
-        },
+        comment: values.comment,
       };
 
       // Save comment to original metadata file
       await FileService.saveJSON(filePath, updatedData);
 
       // If this is a screenshot (has a file path), copy it to capture directory
-      if (data.content.screenshot?.startsWith("file://")) {
-        const screenshotPath = data.content.screenshot.replace("file://", "");
+      if (data.screenshotPath?.startsWith("file://")) {
+        const screenshotPath = data.screenshotPath.replace("file://", "");
         const timestamp = new Date().toISOString().replace(/:/g, "-");
         const newScreenshotName = `screenshot-${timestamp}.png`;
         const newScreenshotPath = path.join(CONFIG.saveDir, newScreenshotName);
@@ -44,16 +41,16 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
 
         // Create capture data
         const captureData: CapturedData = {
-          content: {
-            text: null,
-            html: null,
-            screenshot: newScreenshotPath,
-          },
-          source: data.source,
-          metadata: {
-            timestamp: new Date().toISOString(),
-            comment: values.comment,
-          },
+          id: data.id,
+          selectedText: null,
+          activeViewContent: null,
+          app: data.app,
+          bundleId: data.bundleId,
+          url: data.url,
+          window: data.window,
+          timestamp: new Date().toISOString(),
+          screenshotPath: newScreenshotPath,
+          comment: values.comment,
         };
 
         // Save capture data
@@ -89,12 +86,12 @@ export function CommentForm({ data, filePath, onCommentSaved }: CommentFormProps
         id="comment"
         title="Comment"
         placeholder="Add any notes about this capture..."
-        defaultValue={data.metadata.comment}
+        defaultValue={data.comment}
         enableMarkdown
       />
       <Form.Description
         title="Capture Info"
-        text={`${data.source.app || "Unknown"} - ${new Date(data.metadata.timestamp).toLocaleString()}`}
+        text={`${data.app || "Unknown"} - ${new Date(data.timestamp).toLocaleString()}`}
       />
     </Form>
   );
