@@ -110,6 +110,24 @@ export const utils = {
   isSupportedBrowser: (appName: string | null): appName is BrowserApp =>
     Boolean(appName && CONFIG.supportedBrowsers.includes(appName as BrowserApp)),
 
+  isValidUrl: (url: string | null | undefined): url is string => {
+    if (!url) return false;
+    // Filter out special URL schemes and browser-specific URLs
+    const invalidSchemes = [
+      "mailto:",
+      "about:",
+      "chrome:",
+      "edge:",
+      "safari:",
+      "firefox:",
+      "brave:",
+      "file:",
+      "tel:",
+      "data:",
+    ];
+    return !invalidSchemes.some((scheme) => url.toLowerCase().startsWith(scheme));
+  },
+
   async getActiveTabInfo(appName: string | null): Promise<TabInfo> {
     if (!utils.isSupportedBrowser(appName)) {
       return { url: null, title: null };
@@ -125,10 +143,8 @@ export const utils = {
           const currentTitle = await runAppleScript(script);
           const matchingTab = activeTabs.find((tab) => tab.title === currentTitle);
           if (matchingTab) {
-            const url = matchingTab.url;
-            // Filter out mailto: and other problematic URLs
             return {
-              url: url && !url.startsWith("mailto:") && !url.startsWith("about:") ? url : null,
+              url: utils.isValidUrl(matchingTab.url) ? matchingTab.url : null,
               title: matchingTab.title ?? null,
             };
           }
@@ -138,9 +154,8 @@ export const utils = {
       }
 
       const activeTab = activeTabs[0];
-      const url = activeTab?.url;
       return {
-        url: url && !url.startsWith("mailto:") && !url.startsWith("about:") ? url : null,
+        url: utils.isValidUrl(activeTab?.url) ? activeTab?.url : null,
         title: activeTab?.title ?? null,
       };
     } catch (error) {
