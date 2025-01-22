@@ -66,9 +66,9 @@ export function CaptureList({
         : `${timeString} - ${capture.data.app || "Unknown"}`;
 
     const metadata = utils.getCaptureMetadata(capture.data);
-    const markdown = capture.data.screenshotPath
-      ? `![Screenshot](${capture.data.screenshotPath.replace(/^file:\/\//, "")})`
-      : undefined;
+    const markdown = capture.data.screenshotUrl
+      ? `![Screenshot](${capture.data.screenshotUrl.replace(/^file:\/\//, "")})`
+      : "";
 
     return (
       <List.Item
@@ -110,11 +110,11 @@ export function CaptureList({
                   shortcut={{ modifiers: ["cmd"], key: "o" }}
                 />
               )}
-              {capture.data.screenshotPath && (
-                <Action.Open
+              {capture.data.screenshotUrl && (
+                <Action.OpenWith
                   title="Open Screenshot"
-                  target={capture.data.screenshotPath}
-                  shortcut={{ modifiers: ["cmd"], key: "s" }}
+                  target={capture.data.screenshotUrl}
+                  shortcut={{ modifiers: ["cmd"], key: "o" }}
                 />
               )}
             </ActionPanel.Section>

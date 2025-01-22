@@ -17,8 +17,8 @@ export default async function Command() {
     }
 
     return {
-      selectedText,
-      screenshotPath: screenshotPath ? utils.getFileUrl(screenshotPath) : null,
+      content: selectedText,
+      screenshotUrl: screenshotPath ? utils.getFileUrl(screenshotPath) : null,
     };
   });
 }

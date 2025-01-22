@@ -18,10 +18,10 @@ export default async function Command() {
       console.debug("Got clipboard text:", clipboardText);
 
       return {
-        selectedText: clipboardText,
-        screenshotPath: screenshotPath ? utils.getFileUrl(screenshotPath) : null,
+        content: clipboardText,
+        screenshotUrl: screenshotPath ? utils.getFileUrl(screenshotPath) : null,
       };
     },
-    (data) => (data.selectedText ? true : "No text in clipboard"),
+    (data) => (data.content ? true : "No text in clipboard"),
   );
 }

@@ -20,19 +20,19 @@ export interface CaptureContext {
   app: string | null;
   bundleId: string | null;
   url: string | null;
-  window: string | null;
-  title: string | null;
+  windowTitle: string | null;
+  pageTitle: string | null;
 }
 
-export interface CapturedData extends Required<Omit<CaptureContext, "title">> {
+export interface CapturedData extends Required<Omit<CaptureContext, "pageTitle">> {
   id: string;
   type: CaptureType;
   timestamp: string;
-  selectedText: string | null;
-  screenshotPath: string | null;
-  activeViewContent: string | null;
+  content: string | null;
+  screenshotUrl: string | null;
+  pageContent: string | null;
   comment?: string;
-  title: string | null;
+  pageTitle: string | null;
 }
 
 interface TabInfo {
@@ -222,8 +222,8 @@ export const utils = {
       app: appName,
       bundleId,
       url: tabInfo.url,
-      window: frontMostApp.name,
-      title: tabInfo.title,
+      windowTitle: frontMostApp.name,
+      pageTitle: tabInfo.title,
     };
   },
 
@@ -245,12 +245,12 @@ export const utils = {
       { label: "Timestamp", value: new Date(capture.timestamp).toLocaleString() },
       { label: "App", value: capture.app },
       { label: "Bundle ID", value: capture.bundleId },
-      { label: "Window", value: capture.window },
+      { label: "Window", value: capture.windowTitle },
     ];
 
     return [
       ...base.filter((item): item is { label: string; value: string } => Boolean(item.value)),
-      ...(capture.selectedText?.trim() ? [{ label: "Selected Text", value: capture.selectedText.trim() }] : []),
+      ...(capture.content?.trim() ? [{ label: "Content", value: capture.content.trim() }] : []),
       ...(capture.comment ? [{ label: "Comment", value: capture.comment }] : []),
     ];
   },
@@ -265,18 +265,18 @@ export const utils = {
       const imagePath = path.join(CONFIG.directories.captures, `screenshot-${utils.sanitizeTimestamp(timestamp)}.png`);
       const jsonPath = path.join(CONFIG.directories.captures, `screenshot-${utils.sanitizeTimestamp(timestamp)}.json`);
 
-      if (!data.screenshotPath) {
-        throw new Error("Screenshot path is missing");
+      if (!data.screenshotUrl) {
+        throw new Error("Screenshot URL is missing");
       }
 
       await utils.ensureDirectory(CONFIG.directories.captures);
-      await fs.copyFile(utils.stripFileProtocol(data.screenshotPath), imagePath);
+      await fs.copyFile(utils.stripFileProtocol(data.screenshotUrl), imagePath);
 
       const captureData: CapturedData = {
         ...data,
         id: path.basename(jsonPath, ".json"),
         timestamp,
-        screenshotPath: utils.getFileUrl(imagePath),
+        screenshotUrl: utils.getFileUrl(imagePath),
         comment,
       };
 
@@ -291,8 +291,8 @@ export const utils = {
 // Simplified capture function
 export async function createCapture(
   type: CaptureType,
-  getData: () => Promise<{ selectedText?: string | null; screenshotPath?: string | null; comment?: string }>,
-  validate?: (data: { selectedText?: string | null; screenshotPath?: string | null }) => boolean | string,
+  getData: () => Promise<{ content?: string | null; screenshotUrl?: string | null; comment?: string }>,
+  validate?: (data: { content?: string | null; screenshotUrl?: string | null }) => boolean | string,
 ) {
   try {
     await utils.showToast({ style: Toast.Style.Animated, title: "Capturing context..." });
@@ -317,11 +317,12 @@ export async function createCapture(
       id: uuidv4(),
       type,
       timestamp,
-      selectedText: data.selectedText ?? null,
-      screenshotPath: data.screenshotPath ?? null,
-      activeViewContent: browserContent,
+      content: data.content ?? null,
+      screenshotUrl: data.screenshotUrl ?? null,
+      pageContent: browserContent,
       ...context,
       comment: data.comment ?? undefined, // Add comment from data
+      pageTitle: context.pageTitle ?? null,
     };
 
     const filePath = utils.getTimestampedPath(CONFIG.directories.captures, type, "json");

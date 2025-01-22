@@ -72,12 +72,12 @@ function CommentForm({ captureData }: { captureData: CaptureData }) {
           console.debug("Got screenshot path:", screenshotPath);
 
           return {
-            selectedText: captureData.selectedText,
-            screenshotPath: screenshotPath ? utils.getFileUrl(screenshotPath) : null,
+            content: captureData.selectedText,
+            screenshotUrl: screenshotPath ? utils.getFileUrl(screenshotPath) : null,
             comment: values.comment
           };
         },
-        (data) => (data.selectedText ? true : "No text in clipboard"),
+        (data) => (data.content ? true : "No text in clipboard"),
       );
       pop();
     } catch (err) {
