@@ -44,7 +44,8 @@ And the context in json\*:
   "bundleId": "9173183",
   "url": "https://distill.pub/2019/activation-atlas/",
   "window": "Orion",
-  "title": "Activation Atlas"
+  "title": "Activation Atlas",
+  "comment": "Like this visualization, but with the neurons grouped by their basis"
 }
 ```
 

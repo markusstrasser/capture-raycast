@@ -133,29 +133,61 @@ export const utils = {
 
     try {
       const tabs = await BrowserExtension.getTabs();
-      const activeTabs = tabs.filter((tab) => tab.active);
 
-      if (activeTabs.length > 1) {
-        const script = `tell application "${appName}" to return title of active tab of front window`;
-        try {
-          const currentTitle = await runAppleScript(script);
-          const matchingTab = activeTabs.find((tab) => tab.title === currentTitle);
-          if (matchingTab) {
-            return {
-              url: utils.isValidUrl(matchingTab.url) ? matchingTab.url : null,
-              title: matchingTab.title ?? null,
-            };
-          }
-        } catch (error) {
-          console.debug("Failed to get current window title:", { error });
+      // Get the window ID of the frontmost window
+      const script = `
+        tell application "${appName}"
+          set windowTitle to title of front window
+          set tabTitle to title of active tab of front window
+          return {windowTitle, tabTitle}
+        end tell
+      `;
+
+      try {
+        const { windowTitle, tabTitle } = await runAppleScript(script).then((result) => {
+          const [windowTitle, tabTitle] = result.split(",");
+          return { windowTitle: windowTitle?.trim(), tabTitle: tabTitle?.trim() };
+        });
+
+        // First try to find the exact match using window title and tab title
+        const matchingTab = tabs.find((tab) =>
+          tab.active && tab.title === tabTitle && tab.window?.title === windowTitle
+        );
+
+        if (matchingTab) {
+          return {
+            url: utils.isValidUrl(matchingTab.url) ? matchingTab.url : null,
+            title: matchingTab.title ?? null,
+          };
         }
-      }
 
-      const activeTab = activeTabs[0];
-      return {
-        url: utils.isValidUrl(activeTab?.url) ? activeTab?.url : null,
-        title: activeTab?.title ?? null,
-      };
+        // Fallback: try to find just by tab title
+        const tabByTitle = tabs.find((tab) => tab.active && tab.title === tabTitle);
+
+        if (tabByTitle) {
+          return {
+            url: utils.isValidUrl(tabByTitle.url) ? tabByTitle.url : null,
+            title: tabByTitle.title ?? null,
+          };
+        }
+
+        // Last resort: get the most recently active tab
+        const activeTabs = tabs.filter((tab) => tab.active);
+        const mostRecentTab = activeTabs[0];
+
+        return {
+          url: utils.isValidUrl(mostRecentTab?.url) ? mostRecentTab?.url : null,
+          title: mostRecentTab?.title ?? null,
+        };
+      } catch (error) {
+        console.debug("Failed to get window/tab info via AppleScript:", { error });
+        // Fallback to basic active tab selection
+        const activeTab = tabs.find((tab) => tab.active);
+        return {
+          url: utils.isValidUrl(activeTab?.url) ? activeTab?.url : null,
+          title: activeTab?.title ?? null,
+        };
+      }
     } catch (error) {
       console.debug("Failed to get tab info:", { browser: appName, error });
       return { url: null, title: null };
@@ -259,7 +291,7 @@ export const utils = {
 // Simplified capture function
 export async function createCapture(
   type: CaptureType,
-  getData: () => Promise<{ selectedText?: string | null; screenshotPath?: string | null }>,
+  getData: () => Promise<{ selectedText?: string | null; screenshotPath?: string | null; comment?: string }>,
   validate?: (data: { selectedText?: string | null; screenshotPath?: string | null }) => boolean | string,
 ) {
   try {
@@ -289,24 +321,20 @@ export async function createCapture(
       screenshotPath: data.screenshotPath ?? null,
       activeViewContent: browserContent,
       ...context,
-      title: context.title ?? null,
+      comment: data.comment ?? undefined, // Add comment from data
     };
 
-    // Create file path and save in parallel
     const filePath = utils.getTimestampedPath(CONFIG.directories.captures, type, "json");
-    await Promise.all([
-      utils.saveJSON(filePath, captureData),
-      utils.showToast({ style: Toast.Style.Success, title: "Context Captured", message: "⌘K to add a comment" }),
-    ]);
+    await utils.saveJSON(filePath, captureData);
 
+    await utils.showToast({ style: Toast.Style.Success, title: "Captured!" });
     await closeMainWindow();
-    return captureData;
   } catch (error) {
-    console.error("Capture failed:", { error });
+    console.error("Capture failed:", error);
     await utils.showToast({
       style: Toast.Style.Failure,
-      title: "Capture Failed",
-      message: String(error),
+      title: "Capture failed",
+      message: error instanceof Error ? error.message : "Unknown error",
     });
     throw error;
   }

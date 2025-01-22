@@ -25,6 +25,12 @@
       "mode": "no-view"
     },
     {
+      "name": "clipboard-capture-with-comment",
+      "title": "Clipboard Capture With Comment",
+      "description": "Capture text from clipboard and add a comment",
+      "mode": "view"
+    },
+    {
       "name": "comment-capture",
       "title": "Comment Captures",
       "description": "Add comments to your captures",

@@ -22,6 +22,8 @@ declare namespace Preferences {
   export type Capture = ExtensionPreferences & {}
   /** Preferences accessible in the `clipboard-capture` command */
   export type ClipboardCapture = ExtensionPreferences & {}
+  /** Preferences accessible in the `clipboard-capture-with-comment` command */
+  export type ClipboardCaptureWithComment = ExtensionPreferences & {}
   /** Preferences accessible in the `comment-capture` command */
   export type CommentCapture = ExtensionPreferences & {}
   /** Preferences accessible in the `comment-screenshot` command */
@@ -35,6 +37,8 @@ declare namespace Arguments {
   export type Capture = {}
   /** Arguments passed to the `clipboard-capture` command */
   export type ClipboardCapture = {}
+  /** Arguments passed to the `clipboard-capture-with-comment` command */
+  export type ClipboardCaptureWithComment = {}
   /** Arguments passed to the `comment-capture` command */
   export type CommentCapture = {}
   /** Arguments passed to the `comment-screenshot` command */
