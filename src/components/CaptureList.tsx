@@ -26,7 +26,7 @@ const getItemIcon = (capture: CapturedData) => {
   if (capture.url) {
     return getFavicon(capture.url, { fallback: "🌐" });
   }
-  return capture.activeViewContent ? "🌐" : "🗒️";
+  return capture.pageContent ? "🌐" : "🗒️";
 };
 
 export function CaptureList({
@@ -61,7 +61,7 @@ export function CaptureList({
     const dateString = date.toLocaleDateString([], { month: "short", day: "numeric" });
     const icon = getItemIcon(capture.data);
     const title =
-      capture.data.title || path.basename(capture.path).startsWith("screenshot-")
+      capture.data.pageTitle || capture.data.windowTitle || path.basename(capture.path).startsWith("screenshot-")
         ? path.basename(capture.path)
         : `${timeString} - ${capture.data.app || "Unknown"}`;
 
@@ -113,7 +113,7 @@ export function CaptureList({
               {capture.data.screenshotUrl && (
                 <Action.OpenWith
                   title="Open Screenshot"
-                  target={capture.data.screenshotUrl}
+                  path={capture.data.screenshotUrl}
                   shortcut={{ modifiers: ["cmd"], key: "o" }}
                 />
               )}

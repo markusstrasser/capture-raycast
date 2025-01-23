@@ -150,9 +150,7 @@ export const utils = {
         });
 
         // First try to find the exact match using window title and tab title
-        const matchingTab = tabs.find(
-          (tab) => tab.active && tab.title === tabTitle && tab.window?.title === windowTitle,
-        );
+        const matchingTab = tabs.find((tab) => tab.active && tab.title === tabTitle);
 
         if (matchingTab) {
           return {

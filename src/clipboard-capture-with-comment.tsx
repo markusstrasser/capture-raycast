@@ -74,7 +74,7 @@ function CommentForm({ captureData }: { captureData: CaptureData }) {
           return {
             content: captureData.selectedText,
             screenshotUrl: screenshotPath ? utils.getFileUrl(screenshotPath) : null,
-            comment: values.comment
+            comment: values.comment,
           };
         },
         (data) => (data.content ? true : "No text in clipboard"),
@@ -92,8 +92,9 @@ function CommentForm({ captureData }: { captureData: CaptureData }) {
           <Action.SubmitForm title="Save Capture" onSubmit={handleSubmit} />
         </ActionPanel>
       }
-      error={error}
+      navigationTitle="Add Comment"
     >
+      {error && <Form.Description text={error} />}
       <Form.TextArea
         id="comment"
         title="Comment"
