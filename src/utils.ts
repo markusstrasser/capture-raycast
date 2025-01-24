@@ -334,7 +334,10 @@ export async function createCapture(
     await utils.saveJSON(filePath, captureData);
 
     await utils.showToast({ style: Toast.Style.Success, title: "Captured!" });
-    await closeMainWindow();
+    // Only close the main window if we're not in a browser
+    if (!utils.isSupportedBrowser(context.app)) {
+      await closeMainWindow();
+    }
   } catch (error) {
     console.error("Capture failed:", error);
     await utils.showToast({
