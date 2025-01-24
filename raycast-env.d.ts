@@ -30,8 +30,6 @@ declare namespace Preferences {
   export type CommentScreenshot = ExtensionPreferences & {}
   /** Preferences accessible in the `manage-directories` command */
   export type ManageDirectories = ExtensionPreferences & {}
-  /** Preferences accessible in the `testcomm` command */
-  export type Testcomm = ExtensionPreferences & {}
 }
 
 declare namespace Arguments {
@@ -47,7 +45,5 @@ declare namespace Arguments {
   export type CommentScreenshot = {}
   /** Arguments passed to the `manage-directories` command */
   export type ManageDirectories = {}
-  /** Arguments passed to the `testcomm` command */
-  export type Testcomm = {}
 }
 
