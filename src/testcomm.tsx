@@ -4,10 +4,12 @@ import { promisify } from "node:util";
 
 const execAsync = promisify(exec);
 
+const emCLIPath = "/opt/homebrew/bin/bun /Users/alien/Documents/MIND/EM/cli.ts";
+
 export default async function Command() {
   try {
     const { stdout, stderr } = await execAsync(
-      '/opt/homebrew/bin/bun /Users/alien/Documents/MIND/EM/cli.ts s imageAnnotate raycast \'{"id":"test123","image":"/Users/alien/Downloads/test.png","comment":"test comment"}\'',
+      `${emCLIPath} s imageAnnotate raycast '{"id":"test123","image":"/Users/alien/Downloads/test.png","comment":"test comment"}'`,
     );
     console.log("Command output:", stdout);
 
