@@ -58,6 +58,12 @@
         "path",
         "folder"
       ]
+    },
+    {
+      "name": "testcomm",
+      "title": "Test DB Command",
+      "description": "Test SQLite DB connection",
+      "mode": "no-view"
     }
   ],
   "preferences": [
