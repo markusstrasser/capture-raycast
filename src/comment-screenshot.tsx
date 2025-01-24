@@ -11,7 +11,7 @@ const getFileStats = async (directory: string, file: string) => {
     const stats = await fs.stat(filePath);
     return { file, path: filePath, stats };
   } catch (error) {
-    console.error("Failed to stat file:", file, error);
+    console.error("Failed to stat file:", { file, error });
     return null;
   }
 };
@@ -39,25 +39,28 @@ export default function Command() {
 
       const validCaptures = fileStats
         .filter((s): s is NonNullable<typeof s> => s !== null)
-        .map(({ path: filePath, stats }) => ({
-          path: filePath,
-          data: {
-            id: path.basename(filePath),
-            type: "screenshot" as const,
-            timestamp: stats.mtime.toISOString(),
-            selectedText: null,
-            content: null,
-            screenshotUrl: utils.getFileUrl(filePath),
-            pageContent: null,
-            app: "Screenshot",
-            bundleId: null,
-            url: null,
-            windowTitle: null,
-            pageTitle: null,
-            activeViewContent: null,
-          },
-          timestamp: stats.mtime,
-        }))
+        .map(({ path: filePath, stats }) => {
+          const screenshotUrl = utils.getFileUrl(filePath);
+          console.debug("Processing screenshot:", { filePath, screenshotUrl });
+
+          return {
+            path: filePath,
+            data: {
+              id: path.basename(filePath),
+              type: "screenshot" as const,
+              timestamp: stats.mtime.toISOString(),
+              content: null,
+              screenshotUrl,
+              pageContent: null,
+              app: "Screenshot",
+              bundleId: null,
+              url: null,
+              windowTitle: null,
+              pageTitle: null,
+            },
+            timestamp: stats.mtime,
+          };
+        })
         .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
       console.debug("Sorted captures:", validCaptures);
@@ -73,7 +76,7 @@ export default function Command() {
   useEffect(() => {
     const watcher = watch(CONFIG.directories.screenshots, (eventType, filename) => {
       if (filename && !filename.startsWith(".")) {
-        console.debug("File change detected:", eventType, filename);
+        console.debug("File change detected:", { eventType, filename });
         loadCaptures();
       }
     });

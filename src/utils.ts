@@ -101,7 +101,11 @@ export const utils = {
   isImageFile: (f: string) => !f.startsWith(".") && /\.(png|gif|mp4|jpg|jpeg|webp|heic)$/i.test(f),
 
   getFileUrl: (filePath: string) => `file://${filePath}`,
-  stripFileProtocol: (url: string) => url.replace(/^file:\/\//, ""),
+
+  stripFileProtocol: (url: string) => {
+    if (!url) return url;
+    return decodeURI(url.replace(/^file:\/\//, ""));
+  },
 
   sanitizeTimestamp: (timestamp: string) => timestamp.replace(/:/g, "-"),
 
@@ -267,8 +271,11 @@ export const utils = {
         throw new Error("Screenshot URL is missing");
       }
 
+      const sourceImagePath = utils.stripFileProtocol(data.screenshotUrl);
+      console.debug("Copying from:", sourceImagePath, "to:", imagePath);
+
       await utils.ensureDirectory(CONFIG.directories.captures);
-      await fs.copyFile(utils.stripFileProtocol(data.screenshotUrl), imagePath);
+      await fs.copyFile(sourceImagePath, imagePath);
 
       const captureData: CapturedData = {
         ...data,

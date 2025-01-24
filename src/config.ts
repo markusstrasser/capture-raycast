@@ -2,6 +2,8 @@ export const CLIConfig = {
   root: "/Users/alien/Documents/MIND/EM/",
   bunExecutable: "/opt/homebrew/bin/bun",
   mediaFolder: "/Users/alien/Documents/MIND/EM/media/",
+  dataFolder: "/Users/alien/Documents/MIND/EM/data/",
+
   cli: {
     path: "/Users/alien/Documents/MIND/EM/cli.ts",
   },
